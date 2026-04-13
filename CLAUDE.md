@@ -87,8 +87,8 @@ order-dashboard/
 # Install dependencies (once requirements.txt exists)
 pip3 install -r requirements.txt --break-system-packages
 
-# Run the dev server
-flask --app order_dashboard run --debug
+# Run the dev server (port 5001 — macOS AirPlay Receiver owns 5000)
+flask --app order_dashboard run --debug --port 5001
 
 # Run tests
 python3 -m pytest tests/ -v

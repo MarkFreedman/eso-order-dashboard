@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% macro field(label, f, name, readonly=False) %}
+<label class="field field-{{ f.band }}{% if readonly %} field-readonly{% endif %}">
+  <span class="field-label">{{ label }}</span>
+  <input type="text"
+         name="{{ name }}"
+         value="{{ f.value }}"
+         {% if readonly %}readonly{% endif %}
+         {% if f.missing %}placeholder="Missing — not found in document"{% endif %}>
+  {% if f.missing %}
+    <span class="field-note">Missing</span>
+  {% elif f.band != "green" %}
+    <span class="field-note">{{ '%.0f'|format(f.score * 100) }}% confidence</span>
+  {% endif %}
+</label>
+{% endmacro %}
+
+{% block title %}Order {{ order.order_number or order.id }} — Eschenbach Order Review{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb">
+  <a href="{{ url_for('queue.index') }}">← Back to Queue</a>
+</nav>
+
+<header class="detail-header">
+  <div class="detail-header-main">
+    <span class="pill pill-{{ order.status_class }}">{{ order.status_label }}</span>
+    <h1>Order {{ order.order_number or order.id }}</h1>
+    {% if order.is_va %}
+      <span class="badge badge-va" title="VA customer — price discrepancies allowed">VA</span>
+    {% endif %}
+  </div>
+  <div class="detail-header-meta">
+    Source: {{ order.source_type }} · {{ order.source_filename }}
+  </div>
+</header>
+
+{% if order.needs_review_reason %}
+<div class="needs-review-banner">
+  <strong>Needs Review:</strong> {{ order.needs_review_reason }}
+  <form class="needs-review-form" method="post" action="{{ url_for('queue.save', order_id=order.id) }}">
+    <input type="text" name="resolved_order_number" placeholder="Enter correct order number">
+    <button type="submit" class="btn btn-secondary">Resolve</button>
+  </form>
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('queue.save', order_id=order.id) }}" class="detail-form">
+<div class="detail-grid">
+
+  <div class="detail-left">
+
+    <section class="field-group">
+      <h2 class="field-group-title">Header</h2>
+      <div class="field-row">
+        {{ field("Order Number", order.f.order_number, "order_number") }}
+        {{ field("PO Number", order.f.po_number, "po_number") }}
+      </div>
+      <div class="field-row">
+        {{ field("Order Date", order.f.order_date, "order_date") }}
+        {{ field("Order Type (S/Q)", order.f.order_type, "order_type") }}
+      </div>
+      <p class="rule-note">Order imports on Hold regardless of source.</p>
+    </section>
+
+    <section class="field-group">
+      <h2 class="field-group-title">Customer</h2>
+      <div class="field-row">
+        {{ field("Customer No.", order.f.customer_no, "customer_no") }}
+        {{ field("Customer Name", order.f.customer_name, "customer_name") }}
+      </div>
+    </section>
+
+    <section class="field-group">
+      <h2 class="field-group-title">Ship To</h2>
+      <p class="rule-note">Ship-to address comes from the order document, not the Sage customer record.</p>
+      {{ field("Recipient", order.f.ship_to_name, "ship_to_name") }}
+      {{ field("Address Line 1", order.f.ship_to_line1, "ship_to_line1") }}
+      {{ field("Address Line 2", order.f.ship_to_line2, "ship_to_line2") }}
+      <div class="field-row">
+        {{ field("City", order.f.ship_to_city, "ship_to_city") }}
+        {{ field("State", order.f.ship_to_state, "ship_to_state") }}
+        {{ field("ZIP", order.f.ship_to_zip, "ship_to_zip") }}
+      </div>
+    </section>
+
+    <section class="field-group">
+      <h2 class="field-group-title">Payment</h2>
+      <div class="field-row">
+        {{ field("Terms", order.f.terms, "terms") }}
+        <label class="field field-readonly">
+          <span class="field-label">Card</span>
+          <input type="text" value="{{ order.payment.card_masked or '—' }}" readonly>
+          <span class="field-note">Masked — PCI</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="field-group">
+      <h2 class="field-group-title">Line Items</h2>
+      <table class="line-items">
+        <thead>
+          <tr>
+            <th class="num">#</th>
+            <th>Item</th>
+            <th>Description</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit</th>
+            <th class="num">Ext</th>
+            <th>Flag</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for li in order.line_items %}
+          <tr class="{% if li.price_flagged %}line-flagged{% endif %}">
+            <td class="num">{{ li.line }}</td>
+            <td><input type="text" name="li_{{ li.line }}_item" value="{{ li.item_number }}"></td>
+            <td><input type="text" name="li_{{ li.line }}_desc" value="{{ li.description }}"></td>
+            <td class="num"><input type="text" class="num" name="li_{{ li.line }}_qty" value="{{ li.quantity }}"></td>
+            <td class="num"><input type="text" class="num" name="li_{{ li.line }}_unit" value="{{ li.unit_price }}"></td>
+            <td class="num">{{ li.extended_price }}</td>
+            <td>
+              {% if li.price_flagged %}
+                {% if order.is_va %}
+                  <span class="badge badge-va" title="VA order — price discrepancy allowed">VA pass</span>
+                {% else %}
+                  <span class="badge badge-price" title="Extracted unit price differs from expected {{ li.expected_price }}">
+                    Price ≠ {{ li.expected_price }}
+                  </span>
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="field-group">
+      <h2 class="field-group-title">Totals</h2>
+      <div class="field-row">
+        {{ field("Subtotal", order.f.subtotal, "subtotal") }}
+        {{ field("Tax", order.f.tax, "tax") }}
+        {{ field("Freight", order.f.freight, "freight") }}
+        {{ field("Total", order.f.total, "total") }}
+      </div>
+    </section>
+
+  </div>
+
+  <aside class="detail-right">
+    {% if order.sample_pdf %}
+    <div class="source-viewer">
+      <div class="source-viewer-header">
+        <span class="source-viewer-title">{{ order.source_filename }}</span>
+        <a class="source-viewer-open" href="{{ url_for('static', filename=order.sample_pdf) }}" target="_blank" rel="noopener">Open in new tab ↗</a>
+      </div>
+      <iframe class="source-viewer-frame"
+              src="{{ url_for('static', filename=order.sample_pdf) }}#toolbar=1&navpanes=0"
+              title="Source document: {{ order.source_filename }}"></iframe>
+      <p class="source-viewer-note">Sample document for mockup only. Production will stream from G drive.</p>
+    </div>
+    {% else %}
+    <div class="source-placeholder">
+      <div class="source-placeholder-icon">PDF</div>
+      <div class="source-placeholder-title">{{ order.source_filename }}</div>
+      <div class="source-placeholder-meta">{{ order.source_pages }} page{{ order.source_pages != 1 and 's' or '' }}</div>
+      <p>Source document viewer not yet wired — depends on G drive UNC path (open dependency).</p>
+    </div>
+    {% endif %}
+  </aside>
+
+</div>
+
+<div class="action-bar">
+  <div class="action-bar-inner">
+    <button type="submit" name="action" value="save" class="btn btn-secondary">Save Draft</button>
+    <button type="submit" name="action" value="submit" class="btn btn-primary">Submit to Sage</button>
+    <button type="submit" name="action" value="error" class="btn btn-danger">Report Error</button>
+  </div>
+</div>
+</form>
+{% endblock %}
