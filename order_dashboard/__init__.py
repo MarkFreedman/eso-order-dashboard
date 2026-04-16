@@ -3,12 +3,13 @@ import secrets
 
 from flask import Flask, Response, request
 
-from . import queue
+from . import db, queue
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("SECRET_KEY", "dev-mockup-secret-not-for-production")
+    db.init_app(app)
     app.register_blueprint(queue.bp)
     _install_basic_auth(app)
     return app

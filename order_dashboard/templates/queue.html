@@ -7,9 +7,11 @@
     <span class="queue-count">{{ orders|length }} orders</span>
   </div>
 
+  <form method="post" action="{{ url_for('queue.batch_submit') }}">
   <table class="queue-table">
     <thead>
       <tr>
+        <th class="check-col"><input type="checkbox" id="select-all" title="Select all"></th>
         <th>Status</th>
         <th>Customer</th>
         <th>Order Date</th>
@@ -21,6 +23,11 @@
     <tbody>
       {% for order in orders %}
       <tr>
+        <td class="check-col">
+          {% if order.status in ('extracted', 'in_review') %}
+          <input type="checkbox" name="order_ids" value="{{ order.id }}">
+          {% endif %}
+        </td>
         <td>
           <span class="pill pill-{{ order.status_class }}">{{ order.status_label }}</span>
         </td>
@@ -53,5 +60,19 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <div class="batch-actions">
+    <button type="submit" class="btn btn-primary"
+            onclick="var n = document.querySelectorAll('input[name=order_ids]:checked').length; if (n === 0) { alert('No orders selected.'); return false; } return confirm('Submit ' + n + ' order(s) to Sage?')">Submit Selected to Sage</button>
+  </div>
+  </form>
+
+  <script>
+    document.getElementById('select-all').addEventListener('change', function() {
+      document.querySelectorAll('input[name="order_ids"]').forEach(function(cb) {
+        cb.checked = this.checked;
+      }.bind(this));
+    });
+  </script>
 </section>
 {% endblock %}

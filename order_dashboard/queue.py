@@ -1,263 +1,28 @@
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+"""Order queue and detail routes — reads from the staging database."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
+
+from . import mapping, queries
 
 bp = Blueprint("queue", __name__)
 
 CONF_GREEN = 0.85
 CONF_YELLOW = 0.60
-
-SAMPLE_ORDERS = [
-    {
-        "id": 1001,
-        "status": "extracted",
-        "customer_name": "VA Medical Center - Palo Alto",
-        "order_date": "2026-04-11",
-        "item_count": 3,
-        "overall_confidence": 0.94,
-        "needs_review_reason": None,
-    },
-    {
-        "id": 1002,
-        "status": "extracted",
-        "customer_name": "Eyecare Associates of Tulsa",
-        "order_date": "2026-04-11",
-        "item_count": 3,
-        "overall_confidence": 0.72,
-        "needs_review_reason": None,
-    },
-    {
-        "id": 1003,
-        "status": "extracted",
-        "customer_name": "Unknown (fax header unreadable)",
-        "order_date": "2026-04-11",
-        "item_count": 2,
-        "overall_confidence": 0.48,
-        "needs_review_reason": "No order number found on document",
-    },
-    {
-        "id": 1004,
-        "status": "in_review",
-        "customer_name": "Low Vision Center of Dallas",
-        "order_date": "2026-04-10",
-        "item_count": 5,
-        "overall_confidence": 0.88,
-        "needs_review_reason": None,
-    },
-    {
-        "id": 1005,
-        "status": "in_review",
-        "customer_name": "VA Medical Center - Phoenix",
-        "order_date": "2026-04-10",
-        "item_count": 7,
-        "overall_confidence": 0.66,
-        "needs_review_reason": None,
-    },
-    {
-        "id": 1006,
-        "status": "error",
-        "customer_name": "Optical Shoppe of Boise",
-        "order_date": "2026-04-09",
-        "item_count": 2,
-        "overall_confidence": 0.55,
-        "needs_review_reason": "Price mismatch on line 2 exceeds tolerance",
-    },
-    {
-        "id": 1007,
-        "status": "submitted",
-        "customer_name": "Hadley Institute for the Blind",
-        "order_date": "2026-04-08",
-        "item_count": 4,
-        "overall_confidence": 0.97,
-        "needs_review_reason": None,
-    },
-    {
-        "id": 1008,
-        "status": "submitted",
-        "customer_name": "VA Medical Center - Bay Pines",
-        "order_date": "2026-04-08",
-        "item_count": 1,
-        "overall_confidence": 0.91,
-        "needs_review_reason": None,
-    },
-]
-
-
-SAMPLE_ORDER_DETAILS = {
-    1001: {
-        "id": 1001,
-        "status": "extracted",
-        "is_va": True,
-        "source_type": "EMAIL",
-        "order_type": "S",
-        "order_number": "VA-2026-0411-A",
-        "po_number": "PO-998877",
-        "order_date": "2026-04-11",
-        "reviewed_by": None,
-        "reviewed_at": None,
-        "needs_review_reason": None,
-        "source_filename": "va_palo_alto_20260411.pdf",
-        "source_pages": 2,
-        "sample_pdf": "samples/va-sample.pdf",
-        "customer_no": "VA0042",
-        "customer_name": "VA Medical Center - Palo Alto",
-        "ship_to": {
-            "name": "Veteran M. Torres",
-            "line1": "3801 Miranda Ave",
-            "line2": "Blind Rehab Unit",
-            "city": "Palo Alto",
-            "state": "CA",
-            "zip": "94304",
-        },
-        "payment": {
-            "terms": "Net 30",
-            "card_masked": None,
-        },
-        "totals": {
-            "subtotal": "412.00",
-            "tax": "0.00",
-            "freight": "12.50",
-            "total": "424.50",
-        },
-        "line_items": [
-            {
-                "line": 1,
-                "item_number": "1661-3",
-                "description": "MAXI PLUS 3x Hand Magnifier",
-                "quantity": 2,
-                "unit_price": "89.00",
-                "expected_price": "89.00",
-                "extended_price": "178.00",
-                "price_flagged": False,
-            },
-            {
-                "line": 2,
-                "item_number": "1511-1",
-                "description": "Mobilent Monocular 4x12",
-                "quantity": 1,
-                "unit_price": "134.00",
-                "expected_price": "134.00",
-                "extended_price": "134.00",
-                "price_flagged": False,
-            },
-            {
-                "line": 3,
-                "item_number": "2655-K",
-                "description": "Smartlux Digital Handheld Video Magnifier",
-                "quantity": 1,
-                "unit_price": "100.00",
-                "expected_price": "112.00",
-                "extended_price": "100.00",
-                "price_flagged": False,
-            },
-        ],
-        "field_confidence": {
-            "order_number": 0.98,
-            "po_number": 0.91,
-            "order_date": 0.99,
-            "order_type": 0.97,
-            "customer_no": 0.96,
-            "customer_name": 0.99,
-            "ship_to_name": 0.88,
-            "ship_to_line1": 0.93,
-            "ship_to_line2": 0.71,
-            "ship_to_city": 0.94,
-            "ship_to_state": 0.98,
-            "ship_to_zip": 0.97,
-            "terms": 0.92,
-            "subtotal": 0.99,
-            "tax": 0.99,
-            "freight": 0.88,
-            "total": 0.99,
-        },
-    },
-    1002: {
-        "id": 1002,
-        "status": "extracted",
-        "is_va": False,
-        "source_type": "FAX",
-        "order_type": "S",
-        "order_number": "TUL-88241",
-        "po_number": "",
-        "order_date": "2026-04-11",
-        "reviewed_by": None,
-        "reviewed_at": None,
-        "needs_review_reason": None,
-        "source_filename": "fax_tulsa_20260411.pdf",
-        "source_pages": 1,
-        "sample_pdf": "samples/mi413-sample.pdf",
-        "customer_no": "EYE0118",
-        "customer_name": "Eyecare Associates of Tulsa",
-        "ship_to": {
-            "name": "Mrs. Helen Ramsey",
-            "line1": "2210 E 21st St",
-            "line2": "",
-            "city": "Tulsa",
-            "state": "OK",
-            "zip": "74114",
-        },
-        "payment": {
-            "terms": "",
-            "card_masked": "VISA*1024",
-        },
-        "totals": {
-            "subtotal": "327.00",
-            "tax": "27.80",
-            "freight": "9.75",
-            "total": "364.55",
-        },
-        "line_items": [
-            {
-                "line": 1,
-                "item_number": "1661-3",
-                "description": "MAXI PLUS 3x Hand Magnifier",
-                "quantity": 1,
-                "unit_price": "89.00",
-                "expected_price": "89.00",
-                "extended_price": "89.00",
-                "price_flagged": False,
-            },
-            {
-                "line": 2,
-                "item_number": "1511-1",
-                "description": "Mobilent Monocular 4x12",
-                "quantity": 1,
-                "unit_price": "98.00",
-                "expected_price": "134.00",
-                "extended_price": "98.00",
-                "price_flagged": True,
-            },
-            {
-                "line": 3,
-                "item_number": "2655-K",
-                "description": "Smartlux Digital Handheld Video Magnifier",
-                "quantity": 1,
-                "unit_price": "140.00",
-                "expected_price": "112.00",
-                "extended_price": "140.00",
-                "price_flagged": True,
-            },
-        ],
-        "field_confidence": {
-            "order_number": 0.82,
-            "po_number": 0.0,
-            "order_date": 0.95,
-            "order_type": 0.94,
-            "customer_no": 0.78,
-            "customer_name": 0.93,
-            "ship_to_name": 0.68,
-            "ship_to_line1": 0.79,
-            "ship_to_line2": 0.0,
-            "ship_to_city": 0.88,
-            "ship_to_state": 0.92,
-            "ship_to_zip": 0.55,
-            "terms": 0.0,
-            "subtotal": 0.96,
-            "tax": 0.88,
-            "freight": 0.52,
-            "total": 0.96,
-        },
-    },
-}
-
 
 STATUS_LABELS = {
     "extracted": "Extracted",
@@ -267,7 +32,9 @@ STATUS_LABELS = {
 }
 
 
-def _conf_band(score: float) -> str:
+def _conf_band(score: float | None) -> str:
+    if score is None:
+        return "red"
     if score >= CONF_GREEN:
         return "green"
     if score >= CONF_YELLOW:
@@ -293,50 +60,278 @@ def _decorate_order(detail: dict) -> dict:
         "status_label": STATUS_LABELS.get(detail["status"], detail["status"]),
         "status_class": detail["status"].replace("_", "-"),
         "f": {
-            "order_number": _field(detail["order_number"], fc["order_number"]),
-            "po_number": _field(detail["po_number"], fc["po_number"]),
-            "order_date": _field(detail["order_date"], fc["order_date"]),
-            "order_type": _field(detail["order_type"], fc["order_type"]),
-            "customer_no": _field(detail["customer_no"], fc["customer_no"]),
-            "customer_name": _field(detail["customer_name"], fc["customer_name"]),
-            "ship_to_name": _field(ship["name"], fc["ship_to_name"]),
-            "ship_to_line1": _field(ship["line1"], fc["ship_to_line1"]),
-            "ship_to_line2": _field(ship["line2"], fc["ship_to_line2"]),
-            "ship_to_city": _field(ship["city"], fc["ship_to_city"]),
-            "ship_to_state": _field(ship["state"], fc["ship_to_state"]),
-            "ship_to_zip": _field(ship["zip"], fc["ship_to_zip"]),
-            "terms": _field(detail["payment"]["terms"], fc["terms"]),
-            "subtotal": _field(detail["totals"]["subtotal"], fc["subtotal"]),
-            "tax": _field(detail["totals"]["tax"], fc["tax"]),
-            "freight": _field(detail["totals"]["freight"], fc["freight"]),
-            "total": _field(detail["totals"]["total"], fc["total"]),
+            "order_number": _field(detail["order_number"], fc.get("order_number", 1.0)),
+            "po_number": _field(detail["po_number"], fc.get("po_number", 1.0)),
+            "order_date": _field(detail["order_date"], fc.get("order_date", 1.0)),
+            "order_type": _field(detail["order_type"], fc.get("order_type", 1.0)),
+            "customer_no": _field(detail["customer_no"], fc.get("customer_no", 1.0)),
+            "customer_name": _field(detail["customer_name"], fc.get("customer_name", 1.0)),
+            "ship_to_name": _field(ship["name"], fc.get("ship_to_name", 1.0)),
+            "ship_to_line1": _field(ship["line1"], fc.get("ship_to_line1", 1.0)),
+            "ship_to_line2": _field(ship["line2"], fc.get("ship_to_line2", 1.0)),
+            "ship_to_city": _field(ship["city"], fc.get("ship_to_city", 1.0)),
+            "ship_to_state": _field(ship["state"], fc.get("ship_to_state", 1.0)),
+            "ship_to_zip": _field(ship["zip"], fc.get("ship_to_zip", 1.0)),
+            "terms": _field(detail["payment"]["terms"], fc.get("terms", 1.0)),
+            "subtotal": _field(detail["totals"]["subtotal"], fc.get("subtotal", 1.0)),
+            "tax": _field(detail["totals"]["tax"], fc.get("tax", 1.0)),
+            "freight": _field(detail["totals"]["freight"], fc.get("freight", 1.0)),
+            "total": _field(detail["totals"]["total"], fc.get("total", 1.0)),
         },
     }
 
 
+# ---------------------------------------------------------------------------
+# Queue view
+# ---------------------------------------------------------------------------
+
 @bp.get("/")
 def index():
+    rows = queries.list_orders()
     orders = [
         {
             **row,
-            "conf_band": _conf_band(row["overall_confidence"]),
+            "customer_name": row.get("customer_name") or row.get("customer_no") or f"Order #{row['id']}",
+            "conf_band": _conf_band(row.get("overall_confidence")),
             "status_label": STATUS_LABELS.get(row["status"], row["status"]),
             "status_class": row["status"].replace("_", "-"),
         }
-        for row in SAMPLE_ORDERS
+        for row in rows
     ]
     return render_template("queue.html", orders=orders)
 
 
+# ---------------------------------------------------------------------------
+# Detail view
+# ---------------------------------------------------------------------------
+
 @bp.get("/orders/<int:order_id>")
 def detail(order_id: int):
-    detail = SAMPLE_ORDER_DETAILS.get(order_id) or SAMPLE_ORDER_DETAILS.get(1001)
-    if detail is None:
+    order = queries.get_order(order_id)
+    if order is None:
         abort(404)
-    return render_template("detail.html", order=_decorate_order(detail))
+    line_items = queries.get_line_items(order_id)
+    sources = queries.get_sources(order_id)
+    detail_dict = mapping.db_to_detail(order, line_items, sources)
+    return render_template("detail.html", order=_decorate_order(detail_dict))
 
+
+# ---------------------------------------------------------------------------
+# Save / Submit / Error actions
+# ---------------------------------------------------------------------------
 
 @bp.post("/orders/<int:order_id>")
 def save(order_id: int):
-    flash(f"Saved order {order_id} (mockup — no DB writes yet)")
+    action = request.form.get("action", "save")
+
+    # Handle needs-review resolution
+    resolved = request.form.get("resolved_order_number", "").strip()
+    if resolved:
+        placeholders = queries.resolve_needs_review(order_id, resolved)
+        _rename_placeholders(placeholders, resolved)
+        flash(f"Order number set to {resolved}")
+        return redirect(url_for("queue.detail", order_id=order_id))
+
+    if action == "save":
+        _save_draft(order_id)
+        flash("Draft saved")
+        return redirect(url_for("queue.detail", order_id=order_id))
+
+    if action == "submit":
+        return _submit_to_sage(order_id)
+
+    if action == "error":
+        queries.mark_error(order_id, "Flagged by reviewer")
+        flash("Order flagged as error")
+        return redirect(url_for("queue.index"))
+
+    return redirect(url_for("queue.detail", order_id=order_id))
+
+
+def _save_draft(order_id: int) -> None:
+    form = request.form
+    fields = {
+        "customer_no": form.get("customer_no", "").strip(),
+        "customer_name": form.get("customer_name", "").strip(),
+        "order_date": form.get("order_date", "").strip(),
+        "po_number": form.get("po_number", "").strip(),
+        "order_type": form.get("order_type", "").strip(),
+        "ship_to_name": form.get("ship_to_name", "").strip(),
+        "ship_to_address1": form.get("ship_to_line1", "").strip(),
+        "ship_to_address2": form.get("ship_to_line2", "").strip(),
+        "ship_to_city": form.get("ship_to_city", "").strip(),
+        "ship_to_state": form.get("ship_to_state", "").strip(),
+        "ship_to_zip": form.get("ship_to_zip", "").strip(),
+    }
+    queries.update_order_fields(order_id, fields)
+
+    # Parse line items from form
+    items = []
+    i = 1
+    while f"li_{i}_item" in form:
+        items.append({
+            "line_number": i,
+            "item_code": form.get(f"li_{i}_item", "").strip(),
+            "item_description": form.get(f"li_{i}_desc", "").strip(),
+            "quantity_ordered": _to_float(form.get(f"li_{i}_qty")),
+            "unit_price": _to_float(form.get(f"li_{i}_unit")),
+        })
+        i += 1
+    if items:
+        queries.update_line_items(order_id, items)
+
+
+def _submit_to_sage(order_id: int):
+    order = queries.get_order(order_id)
+    if order is None:
+        abort(404)
+    line_items = queries.get_line_items(order_id)
+    sources = queries.get_sources(order_id)
+
+    vi_dict = mapping.detail_to_vi(order, line_items, sources)
+
+    try:
+        from vi_export_generator import order_to_csv_rows, write_csv
+    except ImportError:
+        flash("VI export generator not installed — cannot submit to Sage")
+        return redirect(url_for("queue.detail", order_id=order_id))
+
+    from datetime import date
+    rows, warnings = order_to_csv_rows(vi_dict, processing_date=date.today())
+    if rows is None:
+        flash(f"VI export failed: {warnings}")
+        return redirect(url_for("queue.detail", order_id=order_id))
+
+    # Write the CSV
+    output_dir = Path(os.environ.get("VI_OUTPUT_DIR", "tmp/vi-output"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"order_{order_id}.csv"
+    output_path = output_dir / filename
+    write_csv(rows, output_path)
+
+    queries.submit_order(order_id, str(output_path))
+    if warnings:
+        flash(f"Submitted to Sage with warnings: {'; '.join(warnings)}")
+    else:
+        flash(f"Submitted to Sage — VI file: {filename}")
     return redirect(url_for("queue.index"))
+
+
+# ---------------------------------------------------------------------------
+# Batch submit
+# ---------------------------------------------------------------------------
+
+@bp.post("/batch-submit")
+def batch_submit():
+    order_ids = request.form.getlist("order_ids", type=int)
+    if not order_ids:
+        flash("No orders selected")
+        return redirect(url_for("queue.index"))
+
+    try:
+        from vi_export_generator import order_to_csv_rows, write_csv
+    except ImportError:
+        flash("VI export generator not installed — cannot submit to Sage")
+        return redirect(url_for("queue.index"))
+
+    from datetime import date
+
+    all_rows = []
+    errors = []
+    submitted_ids = []
+
+    for oid in order_ids:
+        order = queries.get_order(oid)
+        if order is None or order["status"] == "submitted":
+            continue
+        line_items = queries.get_line_items(oid)
+        sources = queries.get_sources(oid)
+        vi_dict = mapping.detail_to_vi(order, line_items, sources)
+        rows, warnings = order_to_csv_rows(vi_dict, processing_date=date.today())
+        if rows is None:
+            errors.append(f"Order {oid}: {warnings}")
+            continue
+        all_rows.extend(rows)
+        submitted_ids.append(oid)
+
+    if not all_rows:
+        flash(f"No orders exported. Errors: {'; '.join(errors)}")
+        return redirect(url_for("queue.index"))
+
+    output_dir = Path(os.environ.get("VI_OUTPUT_DIR", "tmp/vi-output"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"batch_{timestamp}.csv"
+    output_path = output_dir / filename
+    write_csv(all_rows, output_path)
+
+    for oid in submitted_ids:
+        queries.submit_order(oid, str(output_path))
+
+    msg = f"Submitted {len(submitted_ids)} orders to Sage — {filename}"
+    if errors:
+        msg += f" ({len(errors)} failed: {'; '.join(errors)})"
+    flash(msg)
+    return redirect(url_for("queue.index"))
+
+
+# ---------------------------------------------------------------------------
+# Source PDF serving
+# ---------------------------------------------------------------------------
+
+@bp.get("/sources/<int:source_id>/file")
+def source_file(source_id: int):
+    from .db import get_db
+    db = get_db()
+    row = db.execute(
+        "SELECT gdrive_path, original_filename FROM sources WHERE id = ?",
+        (source_id,),
+    ).fetchone()
+    if row is None or not row["gdrive_path"]:
+        abort(404)
+
+    storage_root = os.environ.get("FILE_STORAGE_ROOT", "../intake-service")
+    full_path = Path(storage_root).resolve() / row["gdrive_path"]
+    if not full_path.exists():
+        abort(404)
+
+    return send_file(
+        str(full_path),
+        mimetype="application/pdf",
+        download_name=row["original_filename"] or "source.pdf",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _rename_placeholders(placeholders: list[dict], order_number: str) -> None:
+    """Rename needs-review placeholder files on disk."""
+    storage_root = os.environ.get("FILE_STORAGE_ROOT", "../intake-service")
+    for p in placeholders:
+        old_path = Path(storage_root) / p["gdrive_path"]
+        if old_path.exists():
+            new_name = f"{order_number}.pdf"
+            new_path = old_path.parent / new_name
+            old_path.rename(new_path)
+            from .db import get_db
+            db = get_db()
+            db.execute(
+                """UPDATE sources
+                   SET gdrive_path = ?, gdrive_filename = ?,
+                       is_placeholder = 0
+                   WHERE id = ?""",
+                (str(Path(p["gdrive_path"]).parent / new_name), new_name, p["id"]),
+            )
+            db.commit()
+
+
+def _to_float(v: str | None) -> float | None:
+    if not v:
+        return None
+    try:
+        return float(v.strip())
+    except (ValueError, AttributeError):
+        return None

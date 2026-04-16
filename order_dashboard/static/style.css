@@ -544,3 +544,13 @@ body {
   color: #991b1b;
 }
 .btn-danger:hover { background: #fef2f2; }
+
+.check-col { width: 36px; text-align: center; }
+.check-col input { cursor: pointer; }
+
+.batch-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0;
+  gap: 10px;
+}

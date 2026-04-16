@@ -150,23 +150,21 @@
   </div>
 
   <aside class="detail-right">
-    {% if order.sample_pdf %}
+    {% if order.source_id %}
     <div class="source-viewer">
       <div class="source-viewer-header">
         <span class="source-viewer-title">{{ order.source_filename }}</span>
-        <a class="source-viewer-open" href="{{ url_for('static', filename=order.sample_pdf) }}" target="_blank" rel="noopener">Open in new tab ↗</a>
+        <a class="source-viewer-open" href="{{ url_for('queue.source_file', source_id=order.source_id) }}" target="_blank" rel="noopener">Open in new tab ↗</a>
       </div>
       <iframe class="source-viewer-frame"
-              src="{{ url_for('static', filename=order.sample_pdf) }}#toolbar=1&navpanes=0"
+              src="{{ url_for('queue.source_file', source_id=order.source_id) }}#toolbar=1&navpanes=0"
               title="Source document: {{ order.source_filename }}"></iframe>
-      <p class="source-viewer-note">Sample document for mockup only. Production will stream from G drive.</p>
     </div>
     {% else %}
     <div class="source-placeholder">
       <div class="source-placeholder-icon">PDF</div>
-      <div class="source-placeholder-title">{{ order.source_filename }}</div>
-      <div class="source-placeholder-meta">{{ order.source_pages }} page{{ order.source_pages != 1 and 's' or '' }}</div>
-      <p>Source document viewer not yet wired — depends on G drive UNC path (open dependency).</p>
+      <div class="source-placeholder-title">{{ order.source_filename or 'No source document' }}</div>
+      <p>Source document not available.</p>
     </div>
     {% endif %}
   </aside>
@@ -176,8 +174,10 @@
 <div class="action-bar">
   <div class="action-bar-inner">
     <button type="submit" name="action" value="save" class="btn btn-secondary">Save Draft</button>
-    <button type="submit" name="action" value="submit" class="btn btn-primary">Submit to Sage</button>
-    <button type="submit" name="action" value="error" class="btn btn-danger">Report Error</button>
+    <button type="submit" name="action" value="submit" class="btn btn-primary"
+            onclick="return confirm('Submit this order to Sage? This will generate the VI import file.')">Submit to Sage</button>
+    <button type="submit" name="action" value="error" class="btn btn-danger"
+            onclick="return confirm('Flag this order as an error?')">Report Error</button>
   </div>
 </div>
 </form>
