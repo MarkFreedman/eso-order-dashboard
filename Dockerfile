@@ -11,6 +11,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY order_dashboard ./order_dashboard
+COPY seed.py .
 
 EXPOSE 8080
 
