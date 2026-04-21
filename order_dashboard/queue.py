@@ -291,8 +291,11 @@ def source_file(source_id: int):
     if row is None or not row["gdrive_path"]:
         abort(404)
 
-    storage_root = os.environ.get("FILE_STORAGE_ROOT", "../intake-service")
-    full_path = Path(storage_root).resolve() / row["gdrive_path"]
+    storage_root = Path(os.environ.get("FILE_STORAGE_ROOT", "../intake-service")).resolve()
+    full_path = (storage_root / row["gdrive_path"]).resolve()
+    # Finding 7: ensure the resolved path stays within the storage root.
+    if not full_path.is_relative_to(storage_root):
+        abort(403)
     if not full_path.exists():
         abort(404)
 
@@ -309,12 +312,18 @@ def source_file(source_id: int):
 
 def _rename_placeholders(placeholders: list[dict], order_number: str) -> None:
     """Rename needs-review placeholder files on disk."""
-    storage_root = os.environ.get("FILE_STORAGE_ROOT", "../intake-service")
+    # Finding 2: sanitize user-supplied order number before using it in a
+    # file rename, and verify the result stays within the storage root.
+    safe = "".join(c for c in order_number if c.isalnum() or c in "-_.")
+    storage_root = Path(os.environ.get("FILE_STORAGE_ROOT", "../intake-service")).resolve()
     for p in placeholders:
-        old_path = Path(storage_root) / p["gdrive_path"]
+        old_path = (storage_root / p["gdrive_path"]).resolve()
+        if not old_path.is_relative_to(storage_root):
+            continue
         if old_path.exists():
-            new_name = f"{order_number}.pdf"
-            new_path = old_path.parent / new_name
+            new_path = (old_path.parent / f"{safe}.pdf").resolve()
+            if not new_path.is_relative_to(storage_root):
+                continue
             old_path.rename(new_path)
             from .db import get_db
             db = get_db()

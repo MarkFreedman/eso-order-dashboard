@@ -1,3 +1,5 @@
+SECURITY-AUDIT.md
+tmp/
 __pycache__/
 *.pyc
 *.pyo

@@ -40,6 +40,7 @@
 <div class="needs-review-banner">
   <strong>Needs Review:</strong> {{ order.needs_review_reason }}
   <form class="needs-review-form" method="post" action="{{ url_for('queue.save', order_id=order.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="text" name="resolved_order_number" placeholder="Enter correct order number">
     <button type="submit" class="btn btn-secondary">Resolve</button>
   </form>
@@ -47,6 +48,7 @@
 {% endif %}
 
 <form method="post" action="{{ url_for('queue.save', order_id=order.id) }}" class="detail-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="detail-grid">
 
   <div class="detail-left">

@@ -8,6 +8,7 @@
   </div>
 
   <form method="post" action="{{ url_for('queue.batch_submit') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <table class="queue-table">
     <thead>
       <tr>
