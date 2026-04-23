@@ -197,9 +197,13 @@ def _submit_to_sage(order_id: int):
         return redirect(url_for("queue.detail", order_id=order_id))
 
     from datetime import date
-    rows, warnings = order_to_csv_rows(vi_dict, processing_date=date.today())
+    rows, messages = order_to_csv_rows(vi_dict, processing_date=date.today())
     if rows is None:
-        flash(f"VI export failed: {warnings}")
+        # messages contains blocking errors (e.g., missing required customer_no).
+        # Surface each one on its own flash line so the reviewer sees what to fix.
+        flash("Cannot submit to Sage. Please correct the following and try again:")
+        for err in messages:
+            flash(f"  - {err}")
         return redirect(url_for("queue.detail", order_id=order_id))
 
     # Write the CSV
@@ -210,10 +214,10 @@ def _submit_to_sage(order_id: int):
     write_csv(rows, output_path)
 
     queries.submit_order(order_id, str(output_path))
-    if warnings:
-        flash(f"Submitted to Sage with warnings: {'; '.join(warnings)}")
+    if messages:
+        flash(f"Submitted to Sage with warnings: {'; '.join(messages)}")
     else:
-        flash(f"Submitted to Sage — VI file: {filename}")
+        flash(f"Submitted to Sage. VI file: {filename}")
     return redirect(url_for("queue.index"))
 
 
@@ -247,15 +251,20 @@ def batch_submit():
         line_items = queries.get_line_items(oid)
         sources = queries.get_sources(oid)
         vi_dict = mapping.detail_to_vi(order, line_items, sources)
-        rows, warnings = order_to_csv_rows(vi_dict, processing_date=date.today())
+        rows, messages = order_to_csv_rows(vi_dict, processing_date=date.today())
         if rows is None:
-            errors.append(f"Order {oid}: {warnings}")
+            # Summarise errors for this order so the reviewer knows which
+            # orders were skipped and why.
+            reasons = "; ".join(messages) if messages else "validation failed"
+            errors.append(f"Order {oid}: {reasons}")
             continue
         all_rows.extend(rows)
         submitted_ids.append(oid)
 
     if not all_rows:
-        flash(f"No orders exported. Errors: {'; '.join(errors)}")
+        flash("No orders exported. All selected orders had validation errors:")
+        for e in errors:
+            flash(f"  - {e}")
         return redirect(url_for("queue.index"))
 
     output_dir = Path(os.environ.get("VI_OUTPUT_DIR", "tmp/vi-output"))
@@ -269,10 +278,11 @@ def batch_submit():
     for oid in submitted_ids:
         queries.submit_order(oid, str(output_path))
 
-    msg = f"Submitted {len(submitted_ids)} orders to Sage — {filename}"
+    flash(f"Submitted {len(submitted_ids)} order(s) to Sage. VI file: {filename}")
     if errors:
-        msg += f" ({len(errors)} failed: {'; '.join(errors)})"
-    flash(msg)
+        flash(f"{len(errors)} order(s) skipped due to validation errors:")
+        for e in errors:
+            flash(f"  - {e}")
     return redirect(url_for("queue.index"))
 
 
