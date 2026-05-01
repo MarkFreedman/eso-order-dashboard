@@ -60,7 +60,6 @@ def _decorate_order(detail: dict) -> dict:
         "status_label": STATUS_LABELS.get(detail["status"], detail["status"]),
         "status_class": detail["status"].replace("_", "-"),
         "f": {
-            "order_number": _field(detail["order_number"], fc.get("order_number", 1.0)),
             "po_number": _field(detail["po_number"], fc.get("po_number", 1.0)),
             "order_date": _field(detail["order_date"], fc.get("order_date", 1.0)),
             "order_type": _field(detail["order_type"], fc.get("order_type", 1.0)),

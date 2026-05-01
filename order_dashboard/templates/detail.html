@@ -16,7 +16,7 @@
 </label>
 {% endmacro %}
 
-{% block title %}Order {{ order.order_number or order.id }} — Eschenbach Order Review{% endblock %}
+{% block title %}Customer PO {{ order.f.po_number.value or order.id }} — Eschenbach Order Review{% endblock %}
 
 {% block content %}
 <nav class="breadcrumb">
@@ -26,7 +26,7 @@
 <header class="detail-header">
   <div class="detail-header-main">
     <span class="pill pill-{{ order.status_class }}">{{ order.status_label }}</span>
-    <h1>Order {{ order.order_number or order.id }}</h1>
+    <h1>Customer PO {{ order.f.po_number.value or order.id }}</h1>
     {% if order.is_va %}
       <span class="badge badge-va" title="VA customer — price discrepancies allowed">VA</span>
     {% endif %}
@@ -56,14 +56,13 @@
     <section class="field-group">
       <h2 class="field-group-title">Header</h2>
       <div class="field-row">
-        {{ field("Order Number", order.f.order_number, "order_number") }}
-        {{ field("PO Number", order.f.po_number, "po_number") }}
+        {{ field("Customer PO", order.f.po_number, "po_number") }}
+        {{ field("Order Date", order.f.order_date, "order_date") }}
       </div>
       <div class="field-row">
-        {{ field("Order Date", order.f.order_date, "order_date") }}
         {{ field("Order Type (S/Q)", order.f.order_type, "order_type") }}
       </div>
-      <p class="rule-note">Order imports on Hold regardless of source.</p>
+      <p class="rule-note">Sage assigns the Sales Order number on import. Order imports on Hold regardless of source.</p>
     </section>
 
     <section class="field-group">

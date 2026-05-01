@@ -55,7 +55,6 @@ def db_to_detail(
         "is_va": is_va,
         "source_type": order.get("order_source") or "EMAIL",
         "order_type": order.get("order_type") or "S",
-        "order_number": order.get("po_number") or "",
         "po_number": order.get("po_number") or "",
         "order_date": order.get("order_date") or "",
         "reviewed_by": order.get("reviewed_by"),
@@ -166,7 +165,6 @@ def _expand_confidence(fc: dict[str, float]) -> dict[str, float]:
     """Expand condensed field confidence into the granular keys the template expects."""
     ship_score = fc.get("ship_to", 1.0)
     return {
-        "order_number": fc.get("customer_po", 1.0),
         "po_number": fc.get("customer_po", 1.0),
         "order_date": fc.get("order_date", 1.0),
         "order_type": 1.0,
