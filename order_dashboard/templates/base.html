@@ -9,6 +9,10 @@
   <header class="app-header">
     <div class="app-header-inner">
       <span class="app-title">Eschenbach Order Review</span>
+      <nav class="app-nav">
+        <a href="{{ url_for('queue.index') }}"{% if request.endpoint == 'queue.index' %} class="active"{% endif %}>Queue</a>
+        <a href="{{ url_for('queue.report') }}"{% if request.endpoint == 'queue.report' %} class="active"{% endif %}>Report</a>
+      </nav>
     </div>
   </header>
   <main class="app-main">

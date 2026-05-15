@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from datetime import date, datetime
+from itertools import groupby
 from pathlib import Path
 
 from flask import (
@@ -98,6 +100,50 @@ def index():
         for row in rows
     ]
     return render_template("queue.html", orders=orders)
+
+
+# ---------------------------------------------------------------------------
+# Daily order-count report
+# ---------------------------------------------------------------------------
+
+@bp.get("/report")
+def report():
+    """Daily count of orders submitted to Sage, each day expandable to its list.
+
+    Lauren's team tracks how many orders they process per day. This groups
+    submitted orders by their submission date and lets each day be expanded
+    to a plain list of the orders that went to Sage that day.
+    """
+    today = date.today()
+    default_start = today.replace(day=1)  # month-to-date
+
+    start = _parse_date(request.args.get("start")) or default_start
+    end = _parse_date(request.args.get("end")) or today
+    if start > end:
+        start, end = end, start
+
+    rows = queries.submitted_orders_in_range(start.isoformat(), end.isoformat())
+
+    days = []
+    for day_str, group in groupby(rows, key=lambda r: r["submitted_day"]):
+        orders = list(group)
+        for order in orders:
+            order["submitted_time"] = _format_time(order.get("submitted_at"))
+        days.append({
+            "date": day_str,
+            "label": _format_day(day_str),
+            "count": len(orders),
+            "orders": orders,
+        })
+
+    return render_template(
+        "report.html",
+        days=days,
+        total=len(rows),
+        day_count=len(days),
+        start=start.isoformat(),
+        end=end.isoformat(),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +390,35 @@ def _rename_placeholders(placeholders: list[dict], order_number: str) -> None:
                 (str(Path(p["gdrive_path"]).parent / new_name), new_name, p["id"]),
             )
             db.commit()
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Parse a YYYY-MM-DD query-string value; return None if absent or invalid."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value.strip(), "%Y-%m-%d").date()
+    except (ValueError, AttributeError):
+        return None
+
+
+def _format_day(day_str: str) -> str:
+    """Format 'YYYY-MM-DD' as 'Thursday, May 14, 2026'."""
+    try:
+        dt = datetime.strptime(day_str, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return day_str
+    return f"{dt:%A, %B} {dt.day}, {dt.year}"
+
+
+def _format_time(ts: str | None) -> str:
+    """Pull HH:MM from an ISO 8601 timestamp and show it as '2:12 PM'."""
+    if not ts or len(ts) < 16:
+        return ""
+    try:
+        return datetime.strptime(ts[11:16], "%H:%M").strftime("%I:%M %p").lstrip("0")
+    except ValueError:
+        return ts[11:16]
 
 
 def _to_float(v: str | None) -> float | None:

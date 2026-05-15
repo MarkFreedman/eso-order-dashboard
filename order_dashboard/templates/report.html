@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Order Report{% endblock %}
+
+{% block content %}
+<section class="report">
+  <div class="report-heading">
+    <h1>Order Report</h1>
+    <span class="report-subtitle">Orders submitted to Sage, counted by day</span>
+  </div>
+
+  <form class="report-filter" method="get" action="{{ url_for('queue.report') }}">
+    <label class="report-filter-field">
+      <span>From</span>
+      <input type="date" name="start" value="{{ start }}">
+    </label>
+    <label class="report-filter-field">
+      <span>To</span>
+      <input type="date" name="end" value="{{ end }}">
+    </label>
+    <button type="submit" class="btn btn-primary">Apply</button>
+  </form>
+
+  <p class="report-summary">
+    <strong>{{ total }}</strong> order{{ '' if total == 1 else 's' }} submitted
+    {%- if day_count %} across <strong>{{ day_count }}</strong> day{{ '' if day_count == 1 else 's' }}{% endif %}
+    <span class="report-summary-range">({{ start }} to {{ end }})</span>
+  </p>
+
+  {% if days %}
+  <div class="report-days">
+    {% for day in days %}
+    <details class="report-day"{% if loop.first %} open{% endif %}>
+      <summary class="report-day-summary">
+        <span class="report-day-date">{{ day.label }}</span>
+        <span class="report-day-count">{{ day.count }} order{{ '' if day.count == 1 else 's' }}</span>
+      </summary>
+      <table class="report-orders">
+        <thead>
+          <tr>
+            <th>Customer PO</th>
+            <th>Customer</th>
+            <th>Source</th>
+            <th>Order Date</th>
+            <th class="num">Items</th>
+            <th>Submitted</th>
+            <th>Reviewed By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in day.orders %}
+          <tr>
+            <td>
+              <a class="customer-link" href="{{ url_for('queue.detail', order_id=order.id) }}">
+                {{ order.po_number or 'Order #' ~ order.id }}
+              </a>
+            </td>
+            <td>{{ order.customer_name or order.customer_no or '-' }}</td>
+            <td>{{ order.order_source or '-' }}</td>
+            <td>{{ order.order_date or '-' }}</td>
+            <td class="num">{{ order.item_count }}</td>
+            <td>{{ order.submitted_time or '-' }}</td>
+            <td>{{ order.reviewed_by or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="report-empty">
+    No orders were submitted to Sage in this date range.
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

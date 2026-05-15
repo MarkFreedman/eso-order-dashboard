@@ -33,6 +33,36 @@ def list_orders() -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def submitted_orders_in_range(start_date: str, end_date: str) -> list[dict[str, Any]]:
+    """Orders submitted to Sage between two dates (inclusive), newest first.
+
+    Feeds the daily order-count report. start_date and end_date are
+    'YYYY-MM-DD' strings. submitted_at is stored as an ISO 8601 string, so its
+    first 10 characters are the submission date; comparing those substrings
+    lexically is a correct date-range filter and avoids depending on SQLite's
+    datetime parsing.
+    """
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT o.id, o.po_number, o.customer_name, o.customer_no,
+               o.order_date, o.order_source, o.submitted_at,
+               o.sage_order_no, o.reviewed_by,
+               substr(o.submitted_at, 1, 10) AS submitted_day,
+               COUNT(li.id) AS item_count
+        FROM orders o
+        LEFT JOIN line_items li ON li.order_id = o.id
+        WHERE o.status = 'submitted'
+          AND o.submitted_at IS NOT NULL
+          AND substr(o.submitted_at, 1, 10) BETWEEN ? AND ?
+        GROUP BY o.id
+        ORDER BY o.submitted_at DESC
+        """,
+        (start_date, end_date),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_order(order_id: int) -> dict[str, Any] | None:
     db = get_db()
     row = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()

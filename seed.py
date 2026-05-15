@@ -7,6 +7,7 @@ Run on Fly.io:
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DB_PATH = os.environ.get("STAGING_DB_PATH", "/data/staging.db")
@@ -203,7 +204,83 @@ conn.execute("""
 """, (order5_id, "attachment", "642-Q6G055.pdf", "application/pdf",
       "samples/va-sample.pdf", "va-sample.pdf", "extracted", "642-Q6G055", 0.97))
 
+# ---------------------------------------------------------------------------
+# Orders 6-8: recently submitted orders so the daily Order Report has live
+# data. Dated relative to "now" so the report always shows recent activity:
+# two orders submitted two days ago, one submitted four days ago.
+# ---------------------------------------------------------------------------
+_now = datetime.now(timezone.utc)
+
+
+def _recent(days_ago, hour, minute):
+    dt = (_now - timedelta(days=days_ago)).replace(
+        hour=hour, minute=minute, second=0, microsecond=0
+    )
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _recent_date(days_ago):
+    return (_now - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+
+
+# customer_no, customer_name, ship_to_name, address, city, state, zip,
+#   order_date_days_ago, po_number, source, payment, submitted_days_ago,
+#   submit_hour, submit_minute, reviewed_by, (item_code, description, qty, price)
+recent_orders = [
+    ("OH210", "OHIO BUREAU OF SERVICES FOR THE VISUALLY IMPAIRED",
+     "MARIA L SANTOS", "150 E CAMPUS VIEW BLVD", "COLUMBUS", "OH", "43235",
+     5, "PO-2026-0061", "EMAIL", "Check", 2, 10, 15, "Lauren Brennan",
+     ("3135", "ESCHENBACH MOBILUX LED 4X ILLUMINATED MAGNIFIER", 2, 89.50)),
+    ("FL880", "FLORIDA DIVISION OF BLIND SERVICES",
+     "VETERAN - HAROLD T BRYANT", "2002 OLD ST AUGUSTINE RD", "TALLAHASSEE", "FL", "32301",
+     4, "623-Q70488", "FAX", "Credit Card", 2, 14, 5, "Dana Whitfield",
+     ("2652-04", "VISOLUX DIGITAL HD POCKET MAGNIFIER", 1, 229.00)),
+    ("TX365-T", "DEPT OF VETERANS AFFAIRS",
+     "VETERAN - CARL J ODOM", "6011 W PARMER LN", "AUSTIN", "TX", "78727",
+     6, "674-6Q9112", "FAX", "Credit Card", 4, 11, 30, "Lauren Brennan",
+     ("1602-04", "HALOGEN LAMP ESCHENBACH 1602-04", 3, 145.30)),
+]
+
+for (cust_no, cust_name, ship_name, ship_addr, ship_city, ship_state, ship_zip,
+     ord_days, po, source, pay, sub_days, sub_h, sub_m, reviewer, item) in recent_orders:
+    cur = conn.execute("""
+        INSERT INTO orders (
+            customer_no, customer_name,
+            ship_to_name, ship_to_address1, ship_to_city, ship_to_state, ship_to_zip,
+            order_date, po_number, order_source, order_type, deposit_payment_type,
+            status, overall_confidence, field_confidence,
+            reviewed_by, reviewed_at, submitted_at, vi_file_path,
+            email_message_id, email_received_at, email_subject, email_sender
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        cust_no, cust_name,
+        ship_name, ship_addr, ship_city, ship_state, ship_zip,
+        _recent_date(ord_days), po, source, "S", pay,
+        "submitted", 0.95,
+        json.dumps({"customer_no": 1.0, "customer_po": 1.0, "order_date": 1.0,
+                    "ship_to": 0.95, "payment_type": 1.0}),
+        reviewer, _recent(sub_days, sub_h, max(sub_m - 3, 0)),
+        _recent(sub_days, sub_h, sub_m),
+        f"/data/vi-output/order_{po}.csv",
+        f"<{po}@mail.example.gov>", _recent(ord_days, 8, 0),
+        f"Purchase Order {po}", "purchasing@example.gov",
+    ))
+    recent_id = cur.lastrowid
+    conn.execute("""
+        INSERT INTO line_items (order_id, line_number, item_code, item_description,
+            quantity_ordered, unit_price)
+        VALUES (?,?,?,?,?,?)
+    """, (recent_id, 1, item[0], item[1], item[2], item[3]))
+    conn.execute("""
+        INSERT INTO sources (order_id, source_type, original_filename, content_type,
+            gdrive_path, gdrive_filename, extraction_status, extracted_order_no,
+            extraction_confidence)
+        VALUES (?,?,?,?,?,?,?,?,?)
+    """, (recent_id, "attachment", f"{po}.pdf", "application/pdf",
+          "samples/va-sample.pdf", "va-sample.pdf", "extracted", po, 0.95))
+
 conn.commit()
 conn.close()
 
-print("Seeded 5 mock orders (1 extracted VA, 1 extracted medium-confidence, 1 in-review, 1 needs-review, 1 submitted)")
+print("Seeded 8 mock orders (1 extracted VA, 1 extracted medium-confidence, "
+      "1 in-review, 1 needs-review, 4 submitted)")
