@@ -340,7 +340,7 @@ def source_file(source_id: int):
     from .db import get_db
     db = get_db()
     row = db.execute(
-        "SELECT gdrive_path, original_filename FROM sources WHERE id = ?",
+        "SELECT gdrive_path, original_filename FROM sources WHERE id = %s",
         (source_id,),
     ).fetchone()
     if row is None or not row["gdrive_path"]:
@@ -384,9 +384,9 @@ def _rename_placeholders(placeholders: list[dict], order_number: str) -> None:
             db = get_db()
             db.execute(
                 """UPDATE sources
-                   SET gdrive_path = ?, gdrive_filename = ?,
+                   SET gdrive_path = %s, gdrive_filename = %s,
                        is_placeholder = 0
-                   WHERE id = ?""",
+                   WHERE id = %s""",
                 (str(Path(p["gdrive_path"]).parent / new_name), new_name, p["id"]),
             )
             db.commit()

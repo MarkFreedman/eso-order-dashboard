@@ -54,7 +54,7 @@ def submitted_orders_in_range(start_date: str, end_date: str) -> list[dict[str, 
         LEFT JOIN line_items li ON li.order_id = o.id
         WHERE o.status = 'submitted'
           AND o.submitted_at IS NOT NULL
-          AND substr(o.submitted_at, 1, 10) BETWEEN ? AND ?
+          AND substr(o.submitted_at, 1, 10) BETWEEN %s AND %s
         GROUP BY o.id
         ORDER BY o.submitted_at DESC
         """,
@@ -65,7 +65,7 @@ def submitted_orders_in_range(start_date: str, end_date: str) -> list[dict[str, 
 
 def get_order(order_id: int) -> dict[str, Any] | None:
     db = get_db()
-    row = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    row = db.execute("SELECT * FROM orders WHERE id = %s", (order_id,)).fetchone()
     if row is None:
         return None
     return dict(row)
@@ -74,7 +74,7 @@ def get_order(order_id: int) -> dict[str, Any] | None:
 def get_line_items(order_id: int) -> list[dict[str, Any]]:
     db = get_db()
     rows = db.execute(
-        "SELECT * FROM line_items WHERE order_id = ? ORDER BY line_number",
+        "SELECT * FROM line_items WHERE order_id = %s ORDER BY line_number",
         (order_id,),
     ).fetchall()
     return [dict(r) for r in rows]
@@ -83,7 +83,7 @@ def get_line_items(order_id: int) -> list[dict[str, Any]]:
 def get_sources(order_id: int) -> list[dict[str, Any]]:
     db = get_db()
     rows = db.execute(
-        "SELECT * FROM sources WHERE order_id = ? ORDER BY id",
+        "SELECT * FROM sources WHERE order_id = %s ORDER BY id",
         (order_id,),
     ).fetchall()
     return [dict(r) for r in rows]
@@ -110,9 +110,9 @@ def update_order_fields(order_id: int, fields: dict[str, Any], reviewed_by: str 
         updates["reviewed_by"] = reviewed_by
         updates["reviewed_at"] = _now()
 
-    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    set_clause = ", ".join(f"{k} = %s" for k in updates)
     values = list(updates.values()) + [order_id]
-    db.execute(f"UPDATE orders SET {set_clause} WHERE id = ?", values)
+    db.execute(f"UPDATE orders SET {set_clause} WHERE id = %s", values)
     db.commit()
 
 
@@ -125,9 +125,9 @@ def update_line_items(order_id: int, items: list[dict[str, Any]]) -> None:
             continue
         db.execute(
             """UPDATE line_items
-               SET item_code = ?, item_description = ?,
-                   quantity_ordered = ?, unit_price = ?
-               WHERE order_id = ? AND line_number = ?""",
+               SET item_code = %s, item_description = %s,
+                   quantity_ordered = %s, unit_price = %s
+               WHERE order_id = %s AND line_number = %s""",
             (
                 item.get("item_code"),
                 item.get("item_description"),
@@ -144,8 +144,8 @@ def submit_order(order_id: int, vi_file_path: str | None = None) -> None:
     db = get_db()
     db.execute(
         """UPDATE orders
-           SET status = 'submitted', submitted_at = ?, vi_file_path = ?
-           WHERE id = ?""",
+           SET status = 'submitted', submitted_at = %s, vi_file_path = %s
+           WHERE id = %s""",
         (_now(), vi_file_path, order_id),
     )
     db.commit()
@@ -154,7 +154,7 @@ def submit_order(order_id: int, vi_file_path: str | None = None) -> None:
 def mark_error(order_id: int, message: str) -> None:
     db = get_db()
     db.execute(
-        "UPDATE orders SET status = 'error', error_message = ? WHERE id = ?",
+        "UPDATE orders SET status = 'error', error_message = %s WHERE id = %s",
         (message, order_id),
     )
     db.commit()
@@ -164,11 +164,11 @@ def resolve_needs_review(order_id: int, order_number: str) -> list[dict[str, Any
     """Set the order number and return placeholder sources for renaming."""
     db = get_db()
     db.execute(
-        "UPDATE orders SET po_number = ?, needs_review_reason = NULL WHERE id = ?",
+        "UPDATE orders SET po_number = %s, needs_review_reason = NULL WHERE id = %s",
         (order_number, order_id),
     )
     placeholders = db.execute(
-        "SELECT id, gdrive_path, placeholder_name FROM sources WHERE order_id = ? AND is_placeholder = 1",
+        "SELECT id, gdrive_path, placeholder_name FROM sources WHERE order_id = %s AND is_placeholder = 1",
         (order_id,),
     ).fetchall()
     db.commit()
