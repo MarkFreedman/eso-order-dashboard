@@ -47,9 +47,9 @@
         <td>{{ order.order_date }}</td>
         <td class="num">{{ order.item_count }}</td>
         <td>
-          <span class="conf conf-{{ order.conf_band }}" title="{{ '%.0f'|format(order.overall_confidence * 100) }}%">
+          <span class="conf conf-{{ order.conf_band }}" title="{{ '%.0f'|format((order.overall_confidence or 0) * 100) }}%">
             <span class="conf-dot"></span>
-            {{ '%.0f'|format(order.overall_confidence * 100) }}%
+            {{ '%.0f'|format((order.overall_confidence or 0) * 100) }}%
           </span>
         </td>
         <td>

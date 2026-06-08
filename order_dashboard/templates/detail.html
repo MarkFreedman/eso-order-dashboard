@@ -7,11 +7,11 @@
          name="{{ name }}"
          value="{{ f.value }}"
          {% if readonly %}readonly{% endif %}
-         {% if f.missing %}placeholder="Missing — not found in document"{% endif %}>
+         {% if f.missing %}placeholder="Not found in the document (optional)"{% endif %}>
   {% if f.missing %}
-    <span class="field-note">Missing</span>
+    <span class="field-note">Not in document</span>
   {% elif f.band != "green" %}
-    <span class="field-note">{{ '%.0f'|format(f.score * 100) }}% confidence</span>
+    <span class="field-note">{{ '%.0f'|format((f.score or 0) * 100) }}% confidence</span>
   {% endif %}
 </label>
 {% endmacro %}
