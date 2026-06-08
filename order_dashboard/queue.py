@@ -200,7 +200,6 @@ def _save_draft(order_id: int) -> None:
         "customer_name": form.get("customer_name", "").strip(),
         "order_date": form.get("order_date", "").strip(),
         "po_number": form.get("po_number", "").strip(),
-        "order_type": form.get("order_type", "").strip(),
         "ship_to_name": form.get("ship_to_name", "").strip(),
         "ship_to_address1": form.get("ship_to_line1", "").strip(),
         "ship_to_address2": form.get("ship_to_line2", "").strip(),
@@ -208,6 +207,12 @@ def _save_draft(order_id: int) -> None:
         "ship_to_state": form.get("ship_to_state", "").strip(),
         "ship_to_zip": form.get("ship_to_zip", "").strip(),
     }
+    # order_type must be the Sage code 'S' or 'Q' (DB check constraint). Coerce
+    # labels and only update it when valid, so a blank or edited value can't 500.
+    ot = form.get("order_type", "").strip().upper()
+    ot = {"S": "S", "Q": "Q", "STANDARD": "S", "QUOTE": "Q"}.get(ot)
+    if ot:
+        fields["order_type"] = ot
     queries.update_order_fields(order_id, fields)
 
     # Parse line items from form
