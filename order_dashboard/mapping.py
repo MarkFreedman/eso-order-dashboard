@@ -29,11 +29,10 @@ def db_to_detail(
 
     # Masked card number for display (PCI: only last 4 digits, never the
     # full number). Only the last 4 digits are ever extracted or stored;
-    # brand is not captured, so the mask always shows "VISA*" as a generic
-    # card indicator.
+    # no card brand is ever captured, so the mask never invents one.
     extraction = _get_extraction_result(sources)
-    last4 = extraction.get("credit_card_last4", {}).get("value") if extraction else None
-    card_masked = f"VISA*{last4}" if last4 else None
+    last4 = _unwrap(extraction.get("credit_card_last4")) if extraction else None
+    card_masked = f"**** {last4}" if last4 else None
 
     # Primary source for the viewer
     primary_source = next(
@@ -231,6 +230,18 @@ def _db_date_to_us(date_str: str | None) -> str | None:
         return dt.strftime("%m/%d/%Y")
     except (ValueError, TypeError):
         return date_str
+
+
+def _unwrap(value: Any) -> Any:
+    """Return the plain value whether it's a raw value or a {"value": ...} wrapper.
+
+    Extraction results normally wrap a field as {"value": ..., "confidence": ...},
+    but tolerate a plain value too so a differently-shaped extraction result
+    doesn't crash the page.
+    """
+    if isinstance(value, dict):
+        return value.get("value")
+    return value
 
 
 def _get_extraction_result(sources: list[dict[str, Any]]) -> dict[str, Any] | None:
