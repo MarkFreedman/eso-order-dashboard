@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}VI Files{% endblock %}
+
+{% block content %}
+<section class="report">
+  <div class="report-heading">
+    <h1>VI Files</h1>
+    <span class="report-subtitle">CSV files created by Submit to Sage, newest first</span>
+  </div>
+
+  {% if files %}
+  <table class="report-orders">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Created</th>
+        <th class="num">Size</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in files %}
+      <tr>
+        <td>{{ f.name }}</td>
+        <td>{{ f.modified_label }}</td>
+        <td class="num">{{ f.size_kb }} KB</td>
+        <td><a class="btn btn-secondary" href="{{ url_for('queue.vi_file', filename=f.name) }}">Download</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="report-empty">
+    No VI files yet. Submit an order to Sage and its CSV will appear here.
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

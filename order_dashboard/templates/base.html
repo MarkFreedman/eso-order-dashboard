@@ -12,6 +12,7 @@
       <nav class="app-nav">
         <a href="{{ url_for('queue.index') }}"{% if request.endpoint == 'queue.index' %} class="active"{% endif %}>Queue</a>
         <a href="{{ url_for('queue.report') }}"{% if request.endpoint == 'queue.report' %} class="active"{% endif %}>Report</a>
+        <a href="{{ url_for('queue.vi_files') }}"{% if request.endpoint == 'queue.vi_files' %} class="active"{% endif %}>VI Files</a>
       </nav>
     </div>
   </header>

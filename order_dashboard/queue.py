@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, datetime
 from itertools import groupby
 from pathlib import Path
@@ -32,6 +33,14 @@ STATUS_LABELS = {
     "submitted": "Submitted",
     "error": "Error",
 }
+
+# Generated VI CSV filenames: order_<id>.csv and batch_<timestamp>.csv.
+_VI_FILENAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.csv$")
+
+
+def _vi_output_dir() -> Path:
+    """Folder where Submit to Sage writes the VI CSV files."""
+    return Path(os.environ.get("VI_OUTPUT_DIR", "tmp/vi-output"))
 
 
 def _conf_band(score: float | None) -> str:
@@ -257,7 +266,7 @@ def _submit_to_sage(order_id: int):
         return redirect(url_for("queue.detail", order_id=order_id))
 
     # Write the CSV
-    output_dir = Path(os.environ.get("VI_OUTPUT_DIR", "tmp/vi-output"))
+    output_dir = _vi_output_dir()
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"order_{order_id}.csv"
     output_path = output_dir / filename
@@ -267,7 +276,7 @@ def _submit_to_sage(order_id: int):
     if messages:
         flash(f"Submitted to Sage with warnings: {'; '.join(messages)}")
     else:
-        flash(f"Submitted to Sage. VI file: {filename}")
+        flash(f"Submitted to Sage. VI file: {filename} (open it from the VI Files page)")
     return redirect(url_for("queue.index"))
 
 
@@ -317,7 +326,7 @@ def batch_submit():
             flash(f"  - {e}")
         return redirect(url_for("queue.index"))
 
-    output_dir = Path(os.environ.get("VI_OUTPUT_DIR", "tmp/vi-output"))
+    output_dir = _vi_output_dir()
     output_dir.mkdir(parents=True, exist_ok=True)
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -328,7 +337,7 @@ def batch_submit():
     for oid in submitted_ids:
         queries.submit_order(oid, str(output_path))
 
-    flash(f"Submitted {len(submitted_ids)} order(s) to Sage. VI file: {filename}")
+    flash(f"Submitted {len(submitted_ids)} order(s) to Sage. VI file: {filename} (open it from the VI Files page)")
     if errors:
         flash(f"{len(errors)} order(s) skipped due to validation errors:")
         for e in errors:
@@ -363,6 +372,50 @@ def source_file(source_id: int):
         str(full_path),
         mimetype="application/pdf",
         download_name=row["original_filename"] or "source.pdf",
+    )
+
+
+# ---------------------------------------------------------------------------
+# VI CSV files (what Submit to Sage produced)
+# ---------------------------------------------------------------------------
+
+@bp.get("/vi-files")
+def vi_files():
+    output_dir = _vi_output_dir()
+    files = []
+    if output_dir.is_dir():
+        for path in output_dir.iterdir():
+            if not path.is_file() or not _VI_FILENAME_RE.match(path.name):
+                continue
+            stat = path.stat()
+            files.append(
+                {
+                    "name": path.name,
+                    "size_kb": max(1, round(stat.st_size / 1024)),
+                    "modified": datetime.fromtimestamp(stat.st_mtime),
+                    "modified_label": datetime.fromtimestamp(stat.st_mtime).strftime(
+                        "%b %d, %Y %I:%M %p"
+                    ),
+                }
+            )
+    files.sort(key=lambda f: f["modified"], reverse=True)
+    return render_template("vi_files.html", files=files)
+
+
+@bp.get("/vi-files/<filename>")
+def vi_file(filename: str):
+    if not _VI_FILENAME_RE.match(filename):
+        abort(404)
+    output_dir = _vi_output_dir().resolve()
+    full_path = (output_dir / filename).resolve()
+    # Same guard as source_file(): the resolved path must stay inside the folder.
+    if not full_path.is_relative_to(output_dir) or not full_path.is_file():
+        abort(404)
+    return send_file(
+        str(full_path),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=filename,
     )
 
 
