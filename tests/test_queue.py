@@ -1,8 +1,4 @@
-from order_dashboard import create_app
-
-
-def test_queue_page_renders():
-    client = create_app().test_client()
+def test_queue_page_renders(client, seed_orders):
     response = client.get("/")
     assert response.status_code == 200
     body = response.get_data(as_text=True)

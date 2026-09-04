@@ -27,6 +27,14 @@ def db_to_detail(
     # Detect VA from extraction result or customer_no pattern
     is_va = _detect_va(order, sources)
 
+    # Masked card number for display (PCI: only last 4 digits, never the
+    # full number). Only the last 4 digits are ever extracted or stored;
+    # brand is not captured, so the mask always shows "VISA*" as a generic
+    # card indicator.
+    extraction = _get_extraction_result(sources)
+    last4 = extraction.get("credit_card_last4", {}).get("value") if extraction else None
+    card_masked = f"VISA*{last4}" if last4 else None
+
     # Primary source for the viewer
     primary_source = next(
         (s for s in sources if s.get("source_type") == "attachment" and s.get("gdrive_path")),
@@ -74,7 +82,7 @@ def db_to_detail(
         },
         "payment": {
             "terms": order.get("deposit_payment_type") or "Check",
-            "card_masked": None,
+            "card_masked": card_masked,
         },
         "totals": _compute_totals(line_items),
         "line_items": template_items,
