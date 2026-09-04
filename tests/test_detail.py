@@ -29,6 +29,20 @@ def test_save_redirects_and_flashes(client, seed_orders):
     assert "Draft saved" in response.get_data(as_text=True)
 
 
+def test_save_draft_succeeds_with_an_empty_comment(client, seed_orders):
+    # The comment textarea has no `required` attribute: both Save Draft and
+    # Submit to Sage post the same form, and enforcement is a server-side
+    # Submit-path concern for a later task, not a browser-level block that
+    # would also stop a plain draft save.
+    response = client.post(
+        "/orders/1002",
+        data={"action": "save", "comment": ""},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Draft saved" in response.get_data(as_text=True)
+
+
 def test_detail_shows_order_source_select_with_stored_value_selected(client, seed_orders):
     response = client.get("/orders/1001")
     assert response.status_code == 200

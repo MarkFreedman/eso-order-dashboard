@@ -30,7 +30,7 @@
 {% macro textarea_field(label, f, name, note) %}
 <label class="field field-{{ f.band }}">
   <span class="field-label">{{ label }}</span>
-  <textarea name="{{ name }}" required>{{ f.value }}</textarea>
+  <textarea name="{{ name }}">{{ f.value }}</textarea>
   <span class="field-note">{{ note }}</span>
 </label>
 {% endmacro %}
