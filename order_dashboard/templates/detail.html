@@ -49,7 +49,7 @@
 </label>
 {% endmacro %}
 
-{% block title %}Customer PO {{ order.f.po_number.value or order.id }} — Eschenbach Order Review{% endblock %}
+{% block title %}Customer PO {{ order.f.po_number.value or order.id }}, Eschenbach Order Review{% endblock %}
 
 {% block content %}
 <nav class="breadcrumb">
@@ -61,7 +61,7 @@
     <span class="pill pill-{{ order.status_class }}">{{ order.status_label }}</span>
     <h1>Customer PO {{ order.f.po_number.value or order.id }}</h1>
     {% if order.is_va %}
-      <span class="badge badge-va" title="VA customer — price discrepancies allowed">VA</span>
+      <span class="badge badge-va" title="VA customer, price discrepancies allowed">VA</span>
     {% endif %}
   </div>
   <div class="detail-header-meta">
@@ -133,7 +133,7 @@
     <section class="field-group">
       <h2 class="field-group-title">Payment</h2>
       <div class="field-row">
-        {{ field("Terms", order.f.terms, "terms") }}
+        {{ select_field("Terms", order.f.terms, "terms", ["Check", "Credit Card"]) }}
         <label class="field field-readonly">
           <span class="field-label">Card</span>
           <input type="text" value="{{ order.payment.card_masked or 'none' }}" readonly>
@@ -168,7 +168,7 @@
             <td>
               {% if li.price_flagged %}
                 {% if order.is_va %}
-                  <span class="badge badge-va" title="VA order — price discrepancy allowed">VA pass</span>
+                  <span class="badge badge-va" title="VA order, price discrepancy allowed">VA pass</span>
                 {% else %}
                   <span class="badge badge-price" title="Extracted unit price differs from expected {{ li.expected_price }}">
                     Price ≠ {{ li.expected_price }}

@@ -28,7 +28,7 @@ def _seed(db_url):
                     {
                         "id": 1,
                         "customer_no": "TX365-T",
-                        "customer_name": "Dept of Veterans Affairs",
+                        "customer_name": "VA Sample Clinic - Riverview",
                         "order_source": "FAX",
                         "order_date": "2026-05-13",
                         "po_number": "PO-AAA",
@@ -38,8 +38,8 @@ def _seed(db_url):
                     },
                     {
                         "id": 2,
-                        "customer_no": "MI413",
-                        "customer_name": "Michigan Commission for the Blind",
+                        "customer_no": "LV413",
+                        "customer_name": "Lakeside Vision Services Agency",
                         "order_source": "EMAIL",
                         "order_date": "2026-05-13",
                         "po_number": "PO-BBB",
@@ -49,8 +49,8 @@ def _seed(db_url):
                     },
                     {
                         "id": 3,
-                        "customer_no": "CA201",
-                        "customer_name": "California Dept of Rehabilitation",
+                        "customer_no": "SV201",
+                        "customer_name": "Statewide Vision Services",
                         "order_source": "FAX",
                         "order_date": "2026-05-11",
                         "po_number": "PO-CCC",
@@ -60,8 +60,8 @@ def _seed(db_url):
                     },
                     {
                         "id": 4,
-                        "customer_no": "NY100",
-                        "customer_name": "New York State Agency",
+                        "customer_no": "RV100",
+                        "customer_name": "Riverview State Agency",
                         "order_source": "EMAIL",
                         "order_date": "2026-05-13",
                         "po_number": "PO-DDD",

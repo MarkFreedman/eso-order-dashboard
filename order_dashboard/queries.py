@@ -26,6 +26,7 @@ def list_orders() -> list[dict[str, Any]]:
                 WHEN 'in_review' THEN 2
                 WHEN 'error' THEN 3
                 WHEN 'submitted' THEN 4
+                WHEN 'skipped' THEN 5
             END,
             o.created_at DESC
         """

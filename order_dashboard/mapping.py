@@ -1,14 +1,16 @@
 """Map DB rows to the dict shapes that templates and vi-export-generator expect.
 
 Two separate mappings:
-  db_to_detail()   — DB rows → template detail dict (for _decorate_order)
-  detail_to_vi()   — DB rows → vi-export-generator order dict
+  db_to_detail()   : DB rows to the template detail dict (for _decorate_order)
+  detail_to_vi()   : DB rows to the vi-export-generator order dict
 """
 
 from __future__ import annotations
 
 import json
 from typing import Any
+
+from vi_export_generator.extract import get_value
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +33,7 @@ def db_to_detail(
     # full number). Only the last 4 digits are ever extracted or stored;
     # no card brand is ever captured, so the mask never invents one.
     extraction = _get_extraction_result(sources)
-    last4 = _unwrap(extraction.get("credit_card_last4")) if extraction else None
+    last4 = get_value(extraction.get("credit_card_last4")) if extraction else None
     card_masked = f"**** {last4}" if last4 else None
 
     # Primary source for the viewer
@@ -151,7 +153,9 @@ def detail_to_vi(
         "order_date": wrap(_db_date_to_us(order.get("order_date"))),
         "ship_to": wrap(ship_to_str),
         "payment_type": order.get("deposit_payment_type") or "Check",
-        "credit_card_last4": wrap(extraction.get("credit_card_last4", {}).get("value") if extraction else None),
+        "credit_card_last4": wrap(
+            get_value(extraction.get("credit_card_last4"), None) if extraction else None
+        ),
         "comment": order.get("comment") or "",
         "ship_via": order.get("ship_via") or "",
         "line_items": vi_items,
@@ -236,18 +240,6 @@ def _db_date_to_us(date_str: str | None) -> str | None:
         return dt.strftime("%m/%d/%Y")
     except (ValueError, TypeError):
         return date_str
-
-
-def _unwrap(value: Any) -> Any:
-    """Return the plain value whether it's a raw value or a {"value": ...} wrapper.
-
-    Extraction results normally wrap a field as {"value": ..., "confidence": ...},
-    but tolerate a plain value too so a differently-shaped extraction result
-    doesn't crash the page.
-    """
-    if isinstance(value, dict):
-        return value.get("value")
-    return value
 
 
 def _get_extraction_result(sources: list[dict[str, Any]]) -> dict[str, Any] | None:

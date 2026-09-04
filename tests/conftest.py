@@ -157,6 +157,8 @@ def seed_orders(client, db_url) -> dict[str, Any]:
     - 1005: skipped (custom prescription eyeglass order, keyed by a
       specialist outside this system). Visible in the queue for awareness
       only; must never be submittable.
+
+    Every organization, person and address below is invented.
     """
     now = datetime.now(timezone.utc)
     yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -175,13 +177,13 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                 {
                     "id": 1001,
                     "customer_no": "VA0042",
-                    "customer_name": "VA Medical Center - Palo Alto",
-                    "ship_to_name": "VETERAN - JAMES R CALDWELL",
-                    "ship_to_address1": "3517 SAULS DR",
+                    "customer_name": "VA Sample Clinic - Riverview",
+                    "ship_to_name": "VETERAN - PAT EXAMPLE",
+                    "ship_to_address1": "100 EXAMPLE WAY",
                     "ship_to_address2": "",
-                    "ship_to_city": "AUSTIN",
+                    "ship_to_city": "RIVERVIEW",
                     "ship_to_state": "TX",
-                    "ship_to_zip": "78728",
+                    "ship_to_zip": "99001",
                     "order_date": "2026-04-14",
                     "po_number": "PO-998877",
                     "order_source": "FAX",
@@ -243,13 +245,13 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                 {
                     "id": 1002,
                     "customer_no": "EYE0118",
-                    "customer_name": "Eyecare Associates of Tulsa",
-                    "ship_to_name": "EYECARE ASSOCIATES OF TULSA",
-                    "ship_to_address1": "4444 S HARVARD AVE",
+                    "customer_name": "Riverview Low Vision Clinic",
+                    "ship_to_name": "RIVERVIEW LOW VISION CLINIC",
+                    "ship_to_address1": "200 EXAMPLE WAY",
                     "ship_to_address2": "",
-                    "ship_to_city": "TULSA",
+                    "ship_to_city": "RIVERVIEW",
                     "ship_to_state": "OK",
-                    "ship_to_zip": "74135",
+                    "ship_to_zip": "99002",
                     "order_date": "2026-04-11",
                     "po_number": "TUL-88241",
                     "order_source": "FAX",
@@ -311,14 +313,14 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                 _INSERT_ORDER_SQL,
                 {
                     "id": 1003,
-                    "customer_no": "CA201",
-                    "customer_name": "California Dept of Rehabilitation",
-                    "ship_to_name": "JOHN M TREVINO",
-                    "ship_to_address1": "1515 S ST",
+                    "customer_no": "SV201",
+                    "customer_name": "Statewide Vision Services",
+                    "ship_to_name": "SAM EXAMPLE",
+                    "ship_to_address1": "300 EXAMPLE WAY",
                     "ship_to_address2": "",
-                    "ship_to_city": "SACRAMENTO",
+                    "ship_to_city": "LAKESIDE",
                     "ship_to_state": "CA",
-                    "ship_to_zip": "95811",
+                    "ship_to_zip": "99003",
                     "order_date": "2026-04-13",
                     "po_number": "623-Q69123",
                     "order_source": "FAX",
@@ -393,11 +395,11 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                     "customer_no": "OPT0077",
                     "customer_name": "Downtown Vision Center",
                     "ship_to_name": "DOWNTOWN VISION CENTER",
-                    "ship_to_address1": "12 MAIN ST",
+                    "ship_to_address1": "400 EXAMPLE WAY",
                     "ship_to_address2": "",
-                    "ship_to_city": "SPRINGFIELD",
+                    "ship_to_city": "FAIRHAVEN",
                     "ship_to_state": "IL",
-                    "ship_to_zip": "62701",
+                    "ship_to_zip": "99004",
                     "order_date": "2026-04-15",
                     "po_number": "SPR-55021",
                     "order_source": "FAX",
