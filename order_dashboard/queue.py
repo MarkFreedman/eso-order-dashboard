@@ -32,6 +32,7 @@ STATUS_LABELS = {
     "in_review": "In Review",
     "submitted": "Submitted",
     "error": "Error",
+    "skipped": "Skipped (custom order)",
 }
 
 # Generated VI CSV filenames: order_<id>.csv and batch_<timestamp>.csv.
@@ -63,6 +64,21 @@ def _field(value, score: float) -> dict:
     }
 
 
+def _optional_field(value, score: float) -> dict:
+    """Like _field(), but never reports "missing".
+
+    Sage fills the customer name in from the customer number on import, so
+    an empty customer name here is not a problem the reviewer needs to fix.
+    """
+    empty = value is None or value == ""
+    return {
+        "value": "" if empty else value,
+        "score": score,
+        "band": "green" if empty else _conf_band(score),
+        "missing": False,
+    }
+
+
 def _decorate_order(detail: dict) -> dict:
     fc = detail["field_confidence"]
     ship = detail["ship_to"]
@@ -75,7 +91,10 @@ def _decorate_order(detail: dict) -> dict:
             "order_date": _field(detail["order_date"], fc.get("order_date", 1.0)),
             "order_type": _field(detail["order_type"], fc.get("order_type", 1.0)),
             "customer_no": _field(detail["customer_no"], fc.get("customer_no", 1.0)),
-            "customer_name": _field(detail["customer_name"], fc.get("customer_name", 1.0)),
+            "customer_name": _optional_field(detail["customer_name"], fc.get("customer_name", 1.0)),
+            "order_source": _field(detail["order_source"], fc.get("order_source", 1.0)),
+            "comment": _field(detail["comment"], fc.get("comment", 1.0)),
+            "ship_via": _field(detail["ship_via"], fc.get("ship_via", 1.0)),
             "ship_to_name": _field(ship["name"], fc.get("ship_to_name", 1.0)),
             "ship_to_line1": _field(ship["line1"], fc.get("ship_to_line1", 1.0)),
             "ship_to_line2": _field(ship["line2"], fc.get("ship_to_line2", 1.0)),
@@ -215,6 +234,8 @@ def _save_draft(order_id: int) -> None:
         "ship_to_city": form.get("ship_to_city", "").strip(),
         "ship_to_state": form.get("ship_to_state", "").strip(),
         "ship_to_zip": form.get("ship_to_zip", "").strip(),
+        "comment": form.get("comment", "").strip(),
+        "ship_via": form.get("ship_via", "").strip(),
     }
     # order_type must be the Sage code 'S' or 'Q' (DB check constraint). Coerce
     # labels and only update it when valid, so a blank or edited value can't 500.
@@ -222,6 +243,12 @@ def _save_draft(order_id: int) -> None:
     ot = {"S": "S", "Q": "Q", "STANDARD": "S", "QUOTE": "Q"}.get(ot)
     if ot:
         fields["order_type"] = ot
+    # order_source must be FAX or EMAIL (DB check constraint). The select
+    # only offers those two options, but only update it when valid so a
+    # tampered post can't 500.
+    src = form.get("order_source", "").strip().upper()
+    if src in ("FAX", "EMAIL"):
+        fields["order_source"] = src
     queries.update_order_fields(order_id, fields)
 
     # Parse line items from form

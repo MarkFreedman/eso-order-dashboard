@@ -16,6 +16,25 @@
 </label>
 {% endmacro %}
 
+{% macro select_field(label, f, name, options) %}
+<label class="field field-{{ f.band }}">
+  <span class="field-label">{{ label }}</span>
+  <select name="{{ name }}">
+    {% for opt in options %}
+    <option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>
+    {% endfor %}
+  </select>
+</label>
+{% endmacro %}
+
+{% macro textarea_field(label, f, name, note) %}
+<label class="field field-{{ f.band }}">
+  <span class="field-label">{{ label }}</span>
+  <textarea name="{{ name }}" required>{{ f.value }}</textarea>
+  <span class="field-note">{{ note }}</span>
+</label>
+{% endmacro %}
+
 {% block title %}Customer PO {{ order.f.po_number.value or order.id }} — Eschenbach Order Review{% endblock %}
 
 {% block content %}
@@ -61,8 +80,10 @@
       </div>
       <div class="field-row">
         {{ field("Order Type (S/Q)", order.f.order_type, "order_type") }}
+        {{ select_field("Order Source", order.f.order_source, "order_source", ["FAX", "EMAIL"]) }}
       </div>
       <p class="rule-note">Sage assigns the Sales Order number on import. Order imports on Hold regardless of source.</p>
+      {{ textarea_field("Comment", order.f.comment, "comment", "Required before Submit: who placed the order, how it came in, your initials.") }}
     </section>
 
     <section class="field-group">
@@ -70,6 +91,9 @@
       <div class="field-row">
         {{ field("Customer No.", order.f.customer_no, "customer_no") }}
         {{ field("Customer Name", order.f.customer_name, "customer_name") }}
+      </div>
+      <div class="field-row">
+        {{ field("Ship Via", order.f.ship_via, "ship_via") }}
       </div>
     </section>
 
@@ -92,8 +116,8 @@
         {{ field("Terms", order.f.terms, "terms") }}
         <label class="field field-readonly">
           <span class="field-label">Card</span>
-          <input type="text" value="{{ order.payment.card_masked or '—' }}" readonly>
-          <span class="field-note">Masked — PCI</span>
+          <input type="text" value="{{ order.payment.card_masked or 'none' }}" readonly>
+          <span class="field-note">Masked (PCI)</span>
         </label>
       </div>
     </section>

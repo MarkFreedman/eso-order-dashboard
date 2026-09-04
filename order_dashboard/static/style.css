@@ -356,15 +356,24 @@ body {
   color: #475569;
   font-weight: 600;
 }
-.field input {
+.field input,
+.field select,
+.field textarea {
   padding: 6px 8px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 14px;
   width: 100%;
   background: #fff;
+  font-family: inherit;
 }
-.field input:focus {
+.field textarea {
+  resize: vertical;
+  min-height: 44px;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   outline: none;
   border-color: #0f2b46;
   box-shadow: 0 0 0 2px rgba(15, 43, 70, 0.15);

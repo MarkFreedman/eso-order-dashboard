@@ -97,7 +97,7 @@ def update_order_fields(order_id: int, fields: dict[str, Any], reviewed_by: str 
         "order_source", "order_type", "deposit_payment_type",
         "ship_to_name", "ship_to_address1", "ship_to_address2",
         "ship_to_city", "ship_to_state", "ship_to_zip",
-        "needs_review_reason",
+        "needs_review_reason", "comment", "ship_via",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
