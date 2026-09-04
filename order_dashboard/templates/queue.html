@@ -56,6 +56,9 @@
           {% if order.needs_review_reason %}
           <span class="badge badge-review" title="{{ order.needs_review_reason }}">Needs Review</span>
           {% endif %}
+          {% if order.skip_reason %}
+          <span class="badge badge-skipped" title="{{ order.skip_reason }}">Skipped</span>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

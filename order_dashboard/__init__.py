@@ -47,7 +47,7 @@ def _install_basic_auth(app: Flask) -> None:
     # all routes open. Remove this check once Entra ID SSO is wired up.
     if not user or not password:
         raise RuntimeError(
-            "No authentication configured — set BASIC_AUTH_USER and BASIC_AUTH_PASSWORD "
+            "No authentication configured: set BASIC_AUTH_USER and BASIC_AUTH_PASSWORD "
             "(or implement Entra ID SSO)"
         )
 

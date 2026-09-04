@@ -7,25 +7,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Flask web app where Eschenbach Optik's customer service team reviews AI-extracted orders before they go into Sage 100 via Visual Integrator. The team (led by Lauren) opens this in a browser, sees a queue of extracted orders, clicks into one, reviews/edits the fields, and hits Submit. Submit generates a VI import file and updates the order status.
 
 This is one of three repos for the Eschenbach order automation project:
-- **vi-export-generator** (sibling repo) — converts extracted order JSON to Visual Integrator CSV for Sage 100 import.
-- **intake-service** (sibling repo) — email monitoring, AI extraction, G drive storage, staging DB owner.
-- **order-dashboard** (this repo) — review UI for Lauren's team.
+- **vi-export-generator** (sibling repo): converts extracted order JSON to Visual Integrator CSV for Sage 100 import.
+- **intake-service** (sibling repo): email monitoring, AI extraction, G drive storage, staging DB owner.
+- **order-dashboard** (this repo): review UI for Lauren's team.
+
+`vi_export_generator/` (repo root) is a vendored copy of the sibling repo's package, not a symlink. It is refreshed by hand from `vi-export-generator` when that package changes; there is no automated sync.
 
 ## Tech Stack
 
 - **Flask** with Jinja2 templates (server-rendered).
-- **SQLite** staging database (owned by intake-service, this app connects read/write).
+- **PostgreSQL** staging database on Neon (owned by intake-service, this app connects read/write) via psycopg 3.
 - **Entra ID SSO** via OpenID Connect for authentication (Lauren's team logs in with their Microsoft accounts).
 - Hosted on **Fly.io** as a subdomain of eschenbach.com (e.g., orders.eschenbach.com).
 
 ## Key Reference Files
 
-- Sibling repo `intake-service/db/schema.sql` — the staging DB schema this app reads from and writes to.
-- Sibling repo `intake-service/db/design-notes.md` — schema rationale.
+- Sibling repo `intake-service/db/schema_pg.sql`: the Postgres staging schema this app reads from and writes to, and the one the tests load. `schema.sql` beside it is the original SQLite version, kept for reference only.
+- Sibling repo `intake-service/db/design-notes.md`: schema rationale.
 - Project-level docs in `~/Dropbox/projects/eschenbach-optic/`:
-  - `design-decisions.md` — architectural decisions (SSO via Entra ID, sources model, needs-review fallback, attachment storage).
-  - `task-list.md` — full task list. Dashboard is task #14. Auth is in #11e.
-  - `everything-we-know.md` — comprehensive project knowledge base.
+  - `design-decisions.md`: architectural decisions (SSO via Entra ID, sources model, needs-review fallback, attachment storage).
+  - `task-list.md`: full task list. Dashboard is task #14. Auth is in #11e.
+  - `everything-we-know.md`: comprehensive project knowledge base.
 
 ## Core Features
 
@@ -60,11 +62,11 @@ The `reviewed_by` field in the orders table stores the display name or email fro
 
 ## Database
 
-This app connects to the same SQLite database that the intake-service owns. Schema is at `../intake-service/db/schema.sql`. Four tables:
-- **orders** — one row per sales order. Status flow: extracted -> in_review -> submitted -> error.
-- **line_items** — one row per line item, joined to orders.
-- **sources** — one row per source document (attachments, email body PDFs). Contains G drive paths for the side-by-side view.
-- **email_watermark** — intake-service only, dashboard doesn't touch this.
+This app connects to the same Neon Postgres database that the intake-service owns, through `DATABASE_URL`. Schema is at `../intake-service/db/schema_pg.sql`. Four tables:
+- **orders**: one row per sales order. Status flow: extracted -> in_review -> submitted -> error.
+- **line_items**: one row per line item, joined to orders.
+- **sources**: one row per source document (attachments, email body PDFs). Contains G drive paths for the side-by-side view.
+- **email_watermark**: intake-service only, dashboard doesn't touch this.
 
 The dashboard reads all four tables (except watermark) and writes to orders (status updates, field edits, review tracking), line_items (field edits), and sources (order_id assignment, placeholder rename on needs-review resolution).
 
@@ -87,10 +89,11 @@ order-dashboard/
 # Install dependencies (once requirements.txt exists)
 pip3 install -r requirements.txt --break-system-packages
 
-# Run the dev server (port 5001 — macOS AirPlay Receiver owns 5000)
+# Run the dev server (port 5001, macOS AirPlay Receiver owns 5000)
 flask --app order_dashboard run --debug --port 5001
 
-# Run tests
+# Run tests (they need TEST_DATABASE_URL; the suite runs against the
+# neondb_test_dash database, never production neondb)
 python3 -m pytest tests/ -v
 ```
 

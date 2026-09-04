@@ -1,12 +1,10 @@
 """Tests for the VI Files page (/vi-files) and CSV download."""
 
-import base64
-
 import pytest
 
 from order_dashboard import create_app
 
-AUTH = {"Authorization": "Basic " + base64.b64encode(b"tester:testpw").decode()}
+from .conftest import AUTH, AUTH_PASSWORD, AUTH_USER
 
 
 @pytest.fixture
@@ -18,10 +16,13 @@ def vi_dir(tmp_path):
 
 @pytest.fixture
 def client(vi_dir, monkeypatch):
+    # This page never touches the database, so it gets its own client
+    # fixture (VI_OUTPUT_DIR instead of DATABASE_URL) rather than the
+    # shared conftest one, reusing only the auth credentials/header.
     monkeypatch.setenv("VI_OUTPUT_DIR", str(vi_dir))
     monkeypatch.setenv("SECRET_KEY", "test-secret")
-    monkeypatch.setenv("BASIC_AUTH_USER", "tester")
-    monkeypatch.setenv("BASIC_AUTH_PASSWORD", "testpw")
+    monkeypatch.setenv("BASIC_AUTH_USER", AUTH_USER)
+    monkeypatch.setenv("BASIC_AUTH_PASSWORD", AUTH_PASSWORD)
     return create_app().test_client()
 
 

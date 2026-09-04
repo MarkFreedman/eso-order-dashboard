@@ -15,7 +15,7 @@ def list_orders() -> list[dict[str, Any]]:
         """
         SELECT o.id, o.status, o.customer_name, o.customer_no, o.po_number,
                o.order_date, o.overall_confidence, o.needs_review_reason,
-               o.order_source, o.created_at,
+               o.order_source, o.created_at, o.skip_reason,
                COUNT(li.id) AS item_count
         FROM orders o
         LEFT JOIN line_items li ON li.order_id = o.id
@@ -26,6 +26,7 @@ def list_orders() -> list[dict[str, Any]]:
                 WHEN 'in_review' THEN 2
                 WHEN 'error' THEN 3
                 WHEN 'submitted' THEN 4
+                WHEN 'skipped' THEN 5
             END,
             o.created_at DESC
         """
@@ -97,7 +98,7 @@ def update_order_fields(order_id: int, fields: dict[str, Any], reviewed_by: str 
         "order_source", "order_type", "deposit_payment_type",
         "ship_to_name", "ship_to_address1", "ship_to_address2",
         "ship_to_city", "ship_to_state", "ship_to_zip",
-        "needs_review_reason",
+        "needs_review_reason", "comment", "ship_via",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:

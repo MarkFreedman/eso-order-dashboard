@@ -93,6 +93,16 @@ def map_header(order, processing_date=None, warnings=None):
     else:
         values["UDF_DepositPaymentType"] = "Check"
 
+    # Comment (max 2048 chars)
+    raw_comment = get_value(order.get("comment"), "")
+    if raw_comment:
+        values["Comment"] = str(raw_comment)[:2048]
+
+    # ShipVia (max 15 chars)
+    raw_ship_via = get_value(order.get("ship_via"), "")
+    if raw_ship_via:
+        values["ShipVia"] = str(raw_ship_via)[:15]
+
     return values
 
 

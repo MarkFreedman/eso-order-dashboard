@@ -1,4 +1,4 @@
-"""Order queue and detail routes — reads from the staging database."""
+"""Order queue and detail routes: reads from the staging database."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from flask import (
 )
 
 from . import mapping, queries
+from .ship_via import SHIP_VIA_CODE_SET, SHIP_VIA_CODES
 
 bp = Blueprint("queue", __name__)
 
@@ -32,6 +33,7 @@ STATUS_LABELS = {
     "in_review": "In Review",
     "submitted": "Submitted",
     "error": "Error",
+    "skipped": "Skipped (custom order)",
 }
 
 # Generated VI CSV filenames: order_<id>.csv and batch_<timestamp>.csv.
@@ -63,6 +65,22 @@ def _field(value, score: float) -> dict:
     }
 
 
+def _optional_field(value, score: float) -> dict:
+    """Like _field(), but never reports "missing".
+
+    For fields a blank value is fine on: Sage fills the customer name in
+    from the customer number on import, and Ship Via is optional, so
+    neither is a problem the reviewer needs to fix.
+    """
+    empty = value is None or value == ""
+    return {
+        "value": "" if empty else value,
+        "score": score,
+        "band": "green" if empty else _conf_band(score),
+        "missing": False,
+    }
+
+
 def _decorate_order(detail: dict) -> dict:
     fc = detail["field_confidence"]
     ship = detail["ship_to"]
@@ -75,7 +93,10 @@ def _decorate_order(detail: dict) -> dict:
             "order_date": _field(detail["order_date"], fc.get("order_date", 1.0)),
             "order_type": _field(detail["order_type"], fc.get("order_type", 1.0)),
             "customer_no": _field(detail["customer_no"], fc.get("customer_no", 1.0)),
-            "customer_name": _field(detail["customer_name"], fc.get("customer_name", 1.0)),
+            "customer_name": _optional_field(detail["customer_name"], fc.get("customer_name", 1.0)),
+            "order_source": _field(detail["order_source"], fc.get("order_source", 1.0)),
+            "comment": _field(detail["comment"], fc.get("comment", 1.0)),
+            "ship_via": _optional_field(detail["ship_via"], fc.get("ship_via", 1.0)),
             "ship_to_name": _field(ship["name"], fc.get("ship_to_name", 1.0)),
             "ship_to_line1": _field(ship["line1"], fc.get("ship_to_line1", 1.0)),
             "ship_to_line2": _field(ship["line2"], fc.get("ship_to_line2", 1.0)),
@@ -167,7 +188,11 @@ def detail(order_id: int):
     line_items = queries.get_line_items(order_id)
     sources = queries.get_sources(order_id)
     detail_dict = mapping.db_to_detail(order, line_items, sources)
-    return render_template("detail.html", order=_decorate_order(detail_dict))
+    return render_template(
+        "detail.html",
+        order=_decorate_order(detail_dict),
+        ship_via_codes=SHIP_VIA_CODES,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +217,14 @@ def save(order_id: int):
         return redirect(url_for("queue.detail", order_id=order_id))
 
     if action == "submit":
+        order = queries.get_order(order_id)
+        if order is not None and order["status"] == "skipped":
+            flash("This order was skipped and cannot be submitted")
+            return redirect(url_for("queue.detail", order_id=order_id))
+        _save_draft(order_id)
+        if not request.form.get("comment", "").strip():
+            flash("Comment is required before Submit to Sage")
+            return redirect(url_for("queue.detail", order_id=order_id))
         return _submit_to_sage(order_id)
 
     if action == "error":
@@ -202,26 +235,63 @@ def save(order_id: int):
     return redirect(url_for("queue.detail", order_id=order_id))
 
 
+# Form field name -> orders column, for the plain text fields.
+_TEXT_FIELDS = {
+    "customer_no": "customer_no",
+    "customer_name": "customer_name",
+    "order_date": "order_date",
+    "po_number": "po_number",
+    "ship_to_name": "ship_to_name",
+    "ship_to_line1": "ship_to_address1",
+    "ship_to_line2": "ship_to_address2",
+    "ship_to_city": "ship_to_city",
+    "ship_to_state": "ship_to_state",
+    "ship_to_zip": "ship_to_zip",
+    "comment": "comment",
+}
+
+# What the Terms field may hold (the deposit_payment_type check constraint).
+_PAYMENT_TYPES = {"check": "Check", "credit card": "Credit Card"}
+
+
 def _save_draft(order_id: int) -> None:
     form = request.form
+    # Only touch fields the post actually carried. A partial post (the
+    # submit path, or a form that renders a subset) must leave everything
+    # else as it is rather than blanking it.
     fields = {
-        "customer_no": form.get("customer_no", "").strip(),
-        "customer_name": form.get("customer_name", "").strip(),
-        "order_date": form.get("order_date", "").strip(),
-        "po_number": form.get("po_number", "").strip(),
-        "ship_to_name": form.get("ship_to_name", "").strip(),
-        "ship_to_address1": form.get("ship_to_line1", "").strip(),
-        "ship_to_address2": form.get("ship_to_line2", "").strip(),
-        "ship_to_city": form.get("ship_to_city", "").strip(),
-        "ship_to_state": form.get("ship_to_state", "").strip(),
-        "ship_to_zip": form.get("ship_to_zip", "").strip(),
+        column: form[name].strip()
+        for name, column in _TEXT_FIELDS.items()
+        if name in form
     }
+    # ship_via must be one of Sage's Ship Via codes, but it is optional: a
+    # posted empty value clears it. Any other value not on Sage's list is
+    # ignored, so a tampered post can't store a code Sage doesn't recognize.
+    if "ship_via" in form:
+        sv = form["ship_via"].strip().upper()
+        if not sv:
+            fields["ship_via"] = ""
+        elif sv in SHIP_VIA_CODE_SET:
+            fields["ship_via"] = sv
+    # Terms is the deposit payment type: 'Check' or 'Credit Card' (DB check
+    # constraint). Only update it when the posted value is one of those.
+    if "terms" in form:
+        terms = _PAYMENT_TYPES.get(form["terms"].strip().lower())
+        if terms:
+            fields["deposit_payment_type"] = terms
     # order_type must be the Sage code 'S' or 'Q' (DB check constraint). Coerce
     # labels and only update it when valid, so a blank or edited value can't 500.
-    ot = form.get("order_type", "").strip().upper()
-    ot = {"S": "S", "Q": "Q", "STANDARD": "S", "QUOTE": "Q"}.get(ot)
+    ot = {"S": "S", "Q": "Q", "STANDARD": "S", "QUOTE": "Q"}.get(
+        form.get("order_type", "").strip().upper()
+    )
     if ot:
         fields["order_type"] = ot
+    # order_source must be FAX or EMAIL (DB check constraint). The select
+    # only offers those two options, but only update it when valid so a
+    # tampered post can't 500.
+    src = form.get("order_source", "").strip().upper()
+    if src in ("FAX", "EMAIL"):
+        fields["order_source"] = src
     queries.update_order_fields(order_id, fields)
 
     # Parse line items from form
@@ -252,7 +322,7 @@ def _submit_to_sage(order_id: int):
     try:
         from vi_export_generator import order_to_csv_rows, write_csv
     except ImportError:
-        flash("VI export generator not installed — cannot submit to Sage")
+        flash("VI export generator not installed, cannot submit to Sage")
         return redirect(url_for("queue.detail", order_id=order_id))
 
     from datetime import date
@@ -294,25 +364,36 @@ def batch_submit():
     try:
         from vi_export_generator import order_to_csv_rows, write_csv
     except ImportError:
-        flash("VI export generator not installed — cannot submit to Sage")
+        flash("VI export generator not installed, cannot submit to Sage")
         return redirect(url_for("queue.index"))
 
     from datetime import date
 
     all_rows = []
     errors = []
+    left_out = []
     submitted_ids = []
 
     for oid in order_ids:
         order = queries.get_order(oid)
         if order is None or order["status"] == "submitted":
             continue
+        # The batch honors the same two rules the single-order submit does:
+        # a skipped order is never submittable, and a comment is required.
+        # Orders that fail either are left untouched and named in a flash,
+        # rather than failing the whole batch.
+        if order["status"] == "skipped":
+            left_out.append(f"Order {oid}: skipped")
+            continue
+        if not (order.get("comment") or "").strip():
+            left_out.append(f"Order {oid}: no comment")
+            continue
         line_items = queries.get_line_items(oid)
         sources = queries.get_sources(oid)
         vi_dict = mapping.detail_to_vi(order, line_items, sources)
         rows, messages = order_to_csv_rows(vi_dict, processing_date=date.today())
         if rows is None:
-            # Summarise errors for this order so the reviewer knows which
+            # Summarize errors for this order so the reviewer knows which
             # orders were skipped and why.
             reasons = "; ".join(messages) if messages else "validation failed"
             errors.append(f"Order {oid}: {reasons}")
@@ -321,8 +402,8 @@ def batch_submit():
         submitted_ids.append(oid)
 
     if not all_rows:
-        flash("No orders exported. All selected orders had validation errors:")
-        for e in errors:
+        flash("No orders exported. None of the selected orders could be submitted:")
+        for e in left_out + errors:
             flash(f"  - {e}")
         return redirect(url_for("queue.index"))
 
@@ -338,6 +419,10 @@ def batch_submit():
         queries.submit_order(oid, str(output_path))
 
     flash(f"Submitted {len(submitted_ids)} order(s) to Sage. VI file: {filename} (open it from the VI Files page)")
+    if left_out:
+        flash(f"{len(left_out)} order(s) left out:")
+        for e in left_out:
+            flash(f"  - {e}")
     if errors:
         flash(f"{len(errors)} order(s) skipped due to validation errors:")
         for e in errors:
@@ -434,7 +519,8 @@ def _rename_placeholders(placeholders: list[dict], order_number: str) -> None:
         if not old_path.is_relative_to(storage_root):
             continue
         if old_path.exists():
-            new_path = (old_path.parent / f"{safe}.pdf").resolve()
+            new_name = f"{safe}.pdf"
+            new_path = (old_path.parent / new_name).resolve()
             if not new_path.is_relative_to(storage_root):
                 continue
             old_path.rename(new_path)

@@ -1,14 +1,16 @@
 """Map DB rows to the dict shapes that templates and vi-export-generator expect.
 
 Two separate mappings:
-  db_to_detail()   — DB rows → template detail dict (for _decorate_order)
-  detail_to_vi()   — DB rows → vi-export-generator order dict
+  db_to_detail()   : DB rows to the template detail dict (for _decorate_order)
+  detail_to_vi()   : DB rows to the vi-export-generator order dict
 """
 
 from __future__ import annotations
 
 import json
 from typing import Any
+
+from vi_export_generator.extract import get_value
 
 
 # ---------------------------------------------------------------------------
@@ -26,6 +28,13 @@ def db_to_detail(
 
     # Detect VA from extraction result or customer_no pattern
     is_va = _detect_va(order, sources)
+
+    # Masked card number for display (PCI: only last 4 digits, never the
+    # full number). Only the last 4 digits are ever extracted or stored;
+    # no card brand is ever captured, so the mask never invents one.
+    extraction = _get_extraction_result(sources)
+    last4 = get_value(extraction.get("credit_card_last4")) if extraction else None
+    card_masked = f"**** {last4}" if last4 else None
 
     # Primary source for the viewer
     primary_source = next(
@@ -60,6 +69,10 @@ def db_to_detail(
         "reviewed_by": order.get("reviewed_by"),
         "reviewed_at": order.get("reviewed_at"),
         "needs_review_reason": order.get("needs_review_reason"),
+        "skip_reason": order.get("skip_reason"),
+        "order_source": order.get("order_source") or "EMAIL",
+        "comment": order.get("comment") or "",
+        "ship_via": order.get("ship_via") or "",
         "source_filename": primary_source.get("original_filename") or primary_source.get("gdrive_filename") or "" if primary_source else "",
         "source_id": primary_source["id"] if primary_source else None,
         "customer_no": order.get("customer_no") or "",
@@ -74,7 +87,7 @@ def db_to_detail(
         },
         "payment": {
             "terms": order.get("deposit_payment_type") or "Check",
-            "card_masked": None,
+            "card_masked": card_masked,
         },
         "totals": _compute_totals(line_items),
         "line_items": template_items,
@@ -140,7 +153,11 @@ def detail_to_vi(
         "order_date": wrap(_db_date_to_us(order.get("order_date"))),
         "ship_to": wrap(ship_to_str),
         "payment_type": order.get("deposit_payment_type") or "Check",
-        "credit_card_last4": wrap(extraction.get("credit_card_last4", {}).get("value") if extraction else None),
+        "credit_card_last4": wrap(
+            get_value(extraction.get("credit_card_last4"), None) if extraction else None
+        ),
+        "comment": order.get("comment") or "",
+        "ship_via": order.get("ship_via") or "",
         "line_items": vi_items,
         "flags": [],
     }

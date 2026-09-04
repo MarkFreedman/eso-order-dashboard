@@ -16,7 +16,40 @@
 </label>
 {% endmacro %}
 
-{% block title %}Customer PO {{ order.f.po_number.value or order.id }} — Eschenbach Order Review{% endblock %}
+{% macro select_field(label, f, name, options) %}
+<label class="field field-{{ f.band }}">
+  <span class="field-label">{{ label }}</span>
+  <select name="{{ name }}">
+    {% for opt in options %}
+    <option value="{{ opt }}" {% if f.value == opt %}selected{% endif %}>{{ opt }}</option>
+    {% endfor %}
+  </select>
+</label>
+{% endmacro %}
+
+{% macro code_select_field(label, f, name, options) %}
+<label class="field field-{{ f.band }}">
+  <span class="field-label">{{ label }}</span>
+  <select name="{{ name }}">
+    {% if not f.value %}
+    <option value="" selected></option>
+    {% endif %}
+    {% for code, meaning in options %}
+    <option value="{{ code }}" {% if f.value == code %}selected{% endif %}>{{ code }}: {{ meaning }}</option>
+    {% endfor %}
+  </select>
+</label>
+{% endmacro %}
+
+{% macro textarea_field(label, f, name, note) %}
+<label class="field field-{{ f.band }}">
+  <span class="field-label">{{ label }}</span>
+  <textarea name="{{ name }}">{{ f.value }}</textarea>
+  <span class="field-note">{{ note }}</span>
+</label>
+{% endmacro %}
+
+{% block title %}Customer PO {{ order.f.po_number.value or order.id }}, Eschenbach Order Review{% endblock %}
 
 {% block content %}
 <nav class="breadcrumb">
@@ -28,13 +61,19 @@
     <span class="pill pill-{{ order.status_class }}">{{ order.status_label }}</span>
     <h1>Customer PO {{ order.f.po_number.value or order.id }}</h1>
     {% if order.is_va %}
-      <span class="badge badge-va" title="VA customer — price discrepancies allowed">VA</span>
+      <span class="badge badge-va" title="VA customer, price discrepancies allowed">VA</span>
     {% endif %}
   </div>
   <div class="detail-header-meta">
     Source: {{ order.source_type }} · {{ order.source_filename }}
   </div>
 </header>
+
+{% if order.status == "skipped" %}
+<div class="skip-banner">
+  <strong>Skipped (custom order):</strong> {{ order.skip_reason }}
+</div>
+{% endif %}
 
 {% if order.needs_review_reason %}
 <div class="needs-review-banner">
@@ -61,8 +100,10 @@
       </div>
       <div class="field-row">
         {{ field("Order Type (S/Q)", order.f.order_type, "order_type") }}
+        {{ select_field("Order Source", order.f.order_source, "order_source", ["FAX", "EMAIL"]) }}
       </div>
       <p class="rule-note">Sage assigns the Sales Order number on import. Order imports on Hold regardless of source.</p>
+      {{ textarea_field("Comment", order.f.comment, "comment", "Required before Submit: who placed the order, how it came in, your initials.") }}
     </section>
 
     <section class="field-group">
@@ -70,6 +111,9 @@
       <div class="field-row">
         {{ field("Customer No.", order.f.customer_no, "customer_no") }}
         {{ field("Customer Name", order.f.customer_name, "customer_name") }}
+      </div>
+      <div class="field-row">
+        {{ code_select_field("Ship Via", order.f.ship_via, "ship_via", ship_via_codes) }}
       </div>
     </section>
 
@@ -89,11 +133,11 @@
     <section class="field-group">
       <h2 class="field-group-title">Payment</h2>
       <div class="field-row">
-        {{ field("Terms", order.f.terms, "terms") }}
+        {{ select_field("Terms", order.f.terms, "terms", ["Check", "Credit Card"]) }}
         <label class="field field-readonly">
           <span class="field-label">Card</span>
-          <input type="text" value="{{ order.payment.card_masked or '—' }}" readonly>
-          <span class="field-note">Masked — PCI</span>
+          <input type="text" value="{{ order.payment.card_masked or 'none' }}" readonly>
+          <span class="field-note">Masked (PCI)</span>
         </label>
       </div>
     </section>
@@ -124,7 +168,7 @@
             <td>
               {% if li.price_flagged %}
                 {% if order.is_va %}
-                  <span class="badge badge-va" title="VA order — price discrepancy allowed">VA pass</span>
+                  <span class="badge badge-va" title="VA order, price discrepancy allowed">VA pass</span>
                 {% else %}
                   <span class="badge badge-price" title="Extracted unit price differs from expected {{ li.expected_price }}">
                     Price ≠ {{ li.expected_price }}
@@ -174,9 +218,11 @@
 
 <div class="action-bar">
   <div class="action-bar-inner">
+    {% if order.status != "skipped" %}
     <button type="submit" name="action" value="save" class="btn btn-secondary">Save Draft</button>
     <button type="submit" name="action" value="submit" class="btn btn-primary"
             onclick="return confirm('Submit this order to Sage? This will generate the VI import file.')">Submit to Sage</button>
+    {% endif %}
     <button type="submit" name="action" value="error" class="btn btn-danger"
             onclick="return confirm('Flag this order as an error?')">Report Error</button>
   </div>
