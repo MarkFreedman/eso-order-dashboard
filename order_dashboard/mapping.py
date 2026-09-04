@@ -67,6 +67,7 @@ def db_to_detail(
         "reviewed_by": order.get("reviewed_by"),
         "reviewed_at": order.get("reviewed_at"),
         "needs_review_reason": order.get("needs_review_reason"),
+        "skip_reason": order.get("skip_reason"),
         "order_source": order.get("order_source") or "EMAIL",
         "comment": order.get("comment") or "",
         "ship_via": order.get("ship_via") or "",

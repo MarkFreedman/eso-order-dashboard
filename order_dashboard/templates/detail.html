@@ -55,6 +55,12 @@
   </div>
 </header>
 
+{% if order.status == "skipped" %}
+<div class="skip-banner">
+  <strong>Skipped (custom order):</strong> {{ order.skip_reason }}
+</div>
+{% endif %}
+
 {% if order.needs_review_reason %}
 <div class="needs-review-banner">
   <strong>Needs Review:</strong> {{ order.needs_review_reason }}
@@ -198,9 +204,11 @@
 
 <div class="action-bar">
   <div class="action-bar-inner">
+    {% if order.status != "skipped" %}
     <button type="submit" name="action" value="save" class="btn btn-secondary">Save Draft</button>
     <button type="submit" name="action" value="submit" class="btn btn-primary"
             onclick="return confirm('Submit this order to Sage? This will generate the VI import file.')">Submit to Sage</button>
+    {% endif %}
     <button type="submit" name="action" value="error" class="btn btn-danger"
             onclick="return confirm('Flag this order as an error?')">Report Error</button>
   </div>

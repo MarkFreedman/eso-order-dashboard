@@ -211,6 +211,10 @@ def save(order_id: int):
         return redirect(url_for("queue.detail", order_id=order_id))
 
     if action == "submit":
+        order = queries.get_order(order_id)
+        if order is not None and order["status"] == "skipped":
+            flash("This order was skipped and cannot be submitted")
+            return redirect(url_for("queue.detail", order_id=order_id))
         _save_draft(order_id)
         if not request.form.get("comment", "").strip():
             flash("Comment is required before Submit to Sage")

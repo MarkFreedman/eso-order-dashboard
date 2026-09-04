@@ -166,6 +166,32 @@ def test_detail_customer_name_empty_does_not_render_missing_note(client, seed_or
     assert "Not in document" not in snippet
 
 
+def test_skipped_order_detail_shows_reason_banner_and_no_submit_button(client, seed_orders):
+    response = client.get("/orders/1005")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Skipped (custom order)" in body
+    assert "Custom prescription eyeglass order" in body
+    assert "Submit to Sage" not in body
+    assert "Save Draft" not in body
+
+
+def test_submit_is_refused_for_a_skipped_order(client, seed_orders, db_url):
+    response = client.post(
+        "/orders/1005",
+        data={"action": "submit", "comment": "Reviewed"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "This order was skipped and cannot be submitted" in response.get_data(as_text=True)
+
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT status FROM orders WHERE id = %s", (1005,))
+            (status,) = cur.fetchone()
+    assert status == "skipped"
+
+
 def test_card_mask_shows_last_four_without_inventing_a_brand(client, seed_orders, db_url):
     # Seed order 1002's source with credit_card_last4 stored as a plain
     # string (not the usual {"value": ...} wrapper) to also exercise the

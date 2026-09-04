@@ -15,7 +15,7 @@ def list_orders() -> list[dict[str, Any]]:
         """
         SELECT o.id, o.status, o.customer_name, o.customer_no, o.po_number,
                o.order_date, o.overall_confidence, o.needs_review_reason,
-               o.order_source, o.created_at,
+               o.order_source, o.created_at, o.skip_reason,
                COUNT(li.id) AS item_count
         FROM orders o
         LEFT JOIN line_items li ON li.order_id = o.id

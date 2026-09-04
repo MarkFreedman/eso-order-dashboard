@@ -130,14 +130,14 @@ _INSERT_ORDER_SQL = """
         ship_to_city, ship_to_state, ship_to_zip,
         order_date, po_number, order_source, order_type, deposit_payment_type,
         status, overall_confidence, field_confidence, needs_review_reason,
-        reviewed_by, reviewed_at, submitted_at
+        reviewed_by, reviewed_at, submitted_at, skip_reason
     ) OVERRIDING SYSTEM VALUE VALUES (
         %(id)s, %(customer_no)s, %(customer_name)s,
         %(ship_to_name)s, %(ship_to_address1)s, %(ship_to_address2)s,
         %(ship_to_city)s, %(ship_to_state)s, %(ship_to_zip)s,
         %(order_date)s, %(po_number)s, %(order_source)s, %(order_type)s, %(deposit_payment_type)s,
         %(status)s, %(overall_confidence)s, %(field_confidence)s, %(needs_review_reason)s,
-        %(reviewed_by)s, %(reviewed_at)s, %(submitted_at)s
+        %(reviewed_by)s, %(reviewed_at)s, %(submitted_at)s, %(skip_reason)s
     )
 """
 
@@ -154,6 +154,9 @@ def seed_orders(client, db_url) -> dict[str, Any]:
     - 1003: submitted yesterday.
     - 1004: needs-review order (no order number found yet) so the queue's
       "Needs Review" badge has something to show.
+    - 1005: skipped (custom prescription eyeglass order, keyed by a
+      specialist outside this system). Visible in the queue for awareness
+      only; must never be submittable.
     """
     now = datetime.now(timezone.utc)
     yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -199,6 +202,7 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                     "reviewed_by": None,
                     "reviewed_at": None,
                     "submitted_at": None,
+                    "skip_reason": None,
                 },
             )
             # Plain execute() per row rather than executemany(): psycopg3's
@@ -266,6 +270,7 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                     "reviewed_by": None,
                     "reviewed_at": None,
                     "submitted_at": None,
+                    "skip_reason": None,
                 },
             )
             cur.execute(
@@ -334,6 +339,7 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                     "reviewed_by": "Lauren Brennan",
                     "reviewed_at": yesterday,
                     "submitted_at": yesterday,
+                    "skip_reason": None,
                 },
             )
             cur.execute(
@@ -375,6 +381,44 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                     "reviewed_by": None,
                     "reviewed_at": None,
                     "submitted_at": None,
+                    "skip_reason": None,
+                },
+            )
+
+            # Order 1005: skipped (custom prescription eyeglass order).
+            cur.execute(
+                _INSERT_ORDER_SQL,
+                {
+                    "id": 1005,
+                    "customer_no": "OPT0077",
+                    "customer_name": "Downtown Vision Center",
+                    "ship_to_name": "DOWNTOWN VISION CENTER",
+                    "ship_to_address1": "12 MAIN ST",
+                    "ship_to_address2": "",
+                    "ship_to_city": "SPRINGFIELD",
+                    "ship_to_state": "IL",
+                    "ship_to_zip": "62701",
+                    "order_date": "2026-04-15",
+                    "po_number": "SPR-55021",
+                    "order_source": "FAX",
+                    "order_type": "S",
+                    "deposit_payment_type": "Check",
+                    "status": "skipped",
+                    "overall_confidence": 0.81,
+                    "field_confidence": json.dumps(
+                        {
+                            "customer_no": 0.9,
+                            "customer_po": 1.0,
+                            "order_date": 1.0,
+                            "ship_to": 0.9,
+                            "payment_type": 1.0,
+                        }
+                    ),
+                    "needs_review_reason": None,
+                    "reviewed_by": None,
+                    "reviewed_at": None,
+                    "submitted_at": None,
+                    "skip_reason": "Custom prescription eyeglass order",
                 },
             )
 
@@ -383,4 +427,5 @@ def seed_orders(client, db_url) -> dict[str, Any]:
         "flagged_order_id": 1002,
         "submitted_order_id": 1003,
         "needs_review_order_id": 1004,
+        "skipped_order_id": 1005,
     }
