@@ -129,6 +129,45 @@ def test_submit_saves_edited_fields_before_generating_the_csv(
     assert ship_to_name == "EDITED SHIP TO NAME"
 
 
+def test_submit_carries_comment_and_ship_via_into_the_csv(
+    client, seed_orders, tmp_path, monkeypatch
+):
+    # Comment and Ship Via are reviewer-entered fields with no source in the
+    # extracted order data, so they only reach Sage if the submit path wires
+    # them into the generator's order dict.
+    monkeypatch.setenv("VI_OUTPUT_DIR", str(tmp_path))
+
+    response = client.post(
+        "/orders/1001",
+        data={
+            "action": "submit",
+            "customer_no": "VA0042",
+            "customer_name": "VA Medical Center - Palo Alto",
+            "order_date": "2026-04-14",
+            "po_number": "PO-998877",
+            "order_type": "S",
+            "order_source": "FAX",
+            "ship_to_name": "VA Medical Center - Palo Alto",
+            "ship_to_line1": "3801 Miranda Ave",
+            "ship_to_line2": "",
+            "ship_to_city": "Palo Alto",
+            "ship_to_state": "CA",
+            "ship_to_zip": "94304",
+            "comment": "Dr Smith/jp",
+            "ship_via": "UPS",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Submitted to Sage" in response.get_data(as_text=True)
+
+    csv_path = tmp_path / "order_1001.csv"
+    with csv_path.open(newline="") as f:
+        header_row = next(csv.reader(f))
+    assert header_row[HEADER_FIELDS.index("Comment")] == "Dr Smith/jp"
+    assert header_row[HEADER_FIELDS.index("ShipVia")] == "UPS"
+
+
 def test_submit_with_an_empty_comment_is_rejected_and_stays_in_review(client, seed_orders, db_url):
     response = client.post(
         "/orders/1001",

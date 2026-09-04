@@ -11,6 +11,8 @@ This is one of three repos for the Eschenbach order automation project:
 - **intake-service** (sibling repo) — email monitoring, AI extraction, G drive storage, staging DB owner.
 - **order-dashboard** (this repo) — review UI for Lauren's team.
 
+`order_dashboard/vi_export_generator/` is a vendored copy of the sibling repo's package, not a symlink. It is refreshed by hand from `vi-export-generator` when that package changes; there is no automated sync.
+
 ## Tech Stack
 
 - **Flask** with Jinja2 templates (server-rendered).

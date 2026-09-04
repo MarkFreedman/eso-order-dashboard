@@ -152,6 +152,8 @@ def detail_to_vi(
         "ship_to": wrap(ship_to_str),
         "payment_type": order.get("deposit_payment_type") or "Check",
         "credit_card_last4": wrap(extraction.get("credit_card_last4", {}).get("value") if extraction else None),
+        "comment": order.get("comment") or "",
+        "ship_via": order.get("ship_via") or "",
         "line_items": vi_items,
         "flags": [],
     }
