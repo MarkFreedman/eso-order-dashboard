@@ -211,6 +211,10 @@ def save(order_id: int):
         return redirect(url_for("queue.detail", order_id=order_id))
 
     if action == "submit":
+        _save_draft(order_id)
+        if not request.form.get("comment", "").strip():
+            flash("Comment is required before Submit to Sage")
+            return redirect(url_for("queue.detail", order_id=order_id))
         return _submit_to_sage(order_id)
 
     if action == "error":

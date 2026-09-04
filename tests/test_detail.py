@@ -1,7 +1,10 @@
+import csv
 import json
 import re
 
 import psycopg
+
+from vi_export_generator.field_layouts import HEADER_FIELDS
 
 
 def test_va_detail_suppresses_price_flag(client, seed_orders):
@@ -82,6 +85,65 @@ def test_save_persists_order_source_comment_and_ship_via(client, seed_orders, db
             )
             row = cur.fetchone()
     assert row == ("Dr Smith/jp", "U", "FAX")
+
+
+def test_submit_saves_edited_fields_before_generating_the_csv(
+    client, seed_orders, tmp_path, monkeypatch
+):
+    # Submit used to build the CSV straight from the database, so an edit
+    # the reviewer just typed (but never explicitly saved) was silently
+    # dropped from the Sage file. Submit must save the draft first.
+    monkeypatch.setenv("VI_OUTPUT_DIR", str(tmp_path))
+
+    # The real form always posts every field (they are all rendered as
+    # inputs), so a realistic post carries order 1001's existing values
+    # along with the one edited field and the required comment.
+    response = client.post(
+        "/orders/1001",
+        data={
+            "action": "submit",
+            "customer_no": "VA0042",
+            "customer_name": "VA Medical Center - Palo Alto",
+            "order_date": "2026-04-14",
+            "po_number": "PO-998877",
+            "order_type": "S",
+            "order_source": "FAX",
+            "ship_to_name": "EDITED SHIP TO NAME",
+            "ship_to_line1": "3517 SAULS DR",
+            "ship_to_line2": "",
+            "ship_to_city": "AUSTIN",
+            "ship_to_state": "TX",
+            "ship_to_zip": "78728",
+            "comment": "Reviewed, matches PO",
+            "ship_via": "",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Submitted to Sage" in response.get_data(as_text=True)
+
+    csv_path = tmp_path / "order_1001.csv"
+    with csv_path.open(newline="") as f:
+        header_row = next(csv.reader(f))
+    ship_to_name = header_row[HEADER_FIELDS.index("ShipToName")]
+    assert ship_to_name == "EDITED SHIP TO NAME"
+
+
+def test_submit_with_an_empty_comment_is_rejected_and_stays_in_review(client, seed_orders, db_url):
+    response = client.post(
+        "/orders/1001",
+        data={"action": "submit", "comment": "   "},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Comment is required before Submit to Sage" in response.get_data(as_text=True)
+
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT status, comment FROM orders WHERE id = %s", (1001,))
+            status, comment = cur.fetchone()
+    assert status == "in_review"
+    assert comment == ""
 
 
 def test_detail_customer_name_empty_does_not_render_missing_note(client, seed_orders):
