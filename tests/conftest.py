@@ -1,7 +1,8 @@
 """Shared pytest fixtures for the order-dashboard suite.
 
-Tests run against a real Postgres database (the neondb_test database),
-never SQLite and never the production neondb database. Set
+Tests run against a real Postgres database (this repo's own
+neondb_test_dash database, derived from TEST_DATABASE_URL, see db_url()
+below), never SQLite and never the production neondb database. Set
 TEST_DATABASE_URL before running the suite (built from the intake-service
 .env by swapping the database name to neondb_test); any test that needs a
 database is skipped, not failed, when it is unset.
@@ -15,6 +16,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
 import pytest
@@ -63,19 +65,24 @@ SCHEMA_PATH = (
 
 @pytest.fixture(scope="session")
 def db_url() -> str:
-    """URL of the neondb_test Postgres database used for tests.
+    """URL of this repo's own neondb_test_dash Postgres database.
 
+    Derived from TEST_DATABASE_URL (same server/credentials, which points at
+    the shared neondb_test database) by swapping the path to
+    /neondb_test_dash via urlsplit/urlunsplit, never a whole-string replace,
+    so this suite's truncate-and-reseed fixtures have their own database and
+    no longer race intake-service's tests over the same neondb_test tables.
     Never the production neondb database: tests that need a database are
-    skipped (not failed) when TEST_DATABASE_URL is not set, and this fixture
-    refuses to run against anything that isn't explicitly the _test database.
+    skipped (not failed) when TEST_DATABASE_URL is not set.
     """
-    url = os.environ.get("TEST_DATABASE_URL")
-    if not url:
+    base_url = os.environ.get("TEST_DATABASE_URL")
+    if not base_url:
         pytest.skip("TEST_DATABASE_URL not set; skipping tests that need Postgres")
-    if "/neondb_test" not in url:
+    url = urlunsplit(urlsplit(base_url)._replace(path="/neondb_test_dash"))
+    if urlsplit(url).path != "/neondb_test_dash":
         pytest.fail(
-            "TEST_DATABASE_URL does not point at neondb_test; refusing to run "
-            "tests against it (never run tests against neondb)"
+            "Failed to derive the neondb_test_dash database URL; refusing "
+            "to run tests against an unexpected database"
         )
     return url
 
