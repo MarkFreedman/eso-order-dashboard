@@ -27,6 +27,20 @@
 </label>
 {% endmacro %}
 
+{% macro code_select_field(label, f, name, options) %}
+<label class="field field-{{ f.band }}">
+  <span class="field-label">{{ label }}</span>
+  <select name="{{ name }}">
+    {% if not f.value %}
+    <option value="" selected></option>
+    {% endif %}
+    {% for code, meaning in options %}
+    <option value="{{ code }}" {% if f.value == code %}selected{% endif %}>{{ code }}: {{ meaning }}</option>
+    {% endfor %}
+  </select>
+</label>
+{% endmacro %}
+
 {% macro textarea_field(label, f, name, note) %}
 <label class="field field-{{ f.band }}">
   <span class="field-label">{{ label }}</span>
@@ -99,7 +113,7 @@
         {{ field("Customer Name", order.f.customer_name, "customer_name") }}
       </div>
       <div class="field-row">
-        {{ field("Ship Via", order.f.ship_via, "ship_via") }}
+        {{ code_select_field("Ship Via", order.f.ship_via, "ship_via", ship_via_codes) }}
       </div>
     </section>
 

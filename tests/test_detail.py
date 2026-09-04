@@ -64,6 +64,27 @@ def test_detail_shows_comment_and_ship_via_fields(client, seed_orders):
     assert "Required before Submit" in body
 
 
+def test_detail_shows_ship_via_select_with_18_options_and_stored_value_selected(
+    client, seed_orders, db_url
+):
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE orders SET ship_via = %s WHERE id = %s", ("U", 1001))
+
+    response = client.get("/orders/1001")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+
+    match = re.search(
+        r'<select name="ship_via">(.*?)</select>', body, re.S
+    )
+    assert match is not None
+    select_body = match.group(1)
+    assert select_body.count("<option") == 18
+    assert '<option value="U" selected>U: UPS Ground</option>' in select_body
+    assert '<option value="M" >M: Mail</option>' in select_body
+
+
 def test_save_persists_order_source_comment_and_ship_via(client, seed_orders, db_url):
     response = client.post(
         "/orders/1002",
@@ -85,6 +106,40 @@ def test_save_persists_order_source_comment_and_ship_via(client, seed_orders, db
             )
             row = cur.fetchone()
     assert row == ("Dr Smith/jp", "U", "FAX")
+
+
+def test_save_persists_a_valid_ship_via_code(client, seed_orders, db_url):
+    response = client.post(
+        "/orders/1002",
+        data={"action": "save", "ship_via": "P"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT ship_via FROM orders WHERE id = %s", (1002,))
+            (ship_via,) = cur.fetchone()
+    assert ship_via == "P"
+
+
+def test_save_ignores_a_ship_via_code_not_on_sages_list(client, seed_orders, db_url):
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE orders SET ship_via = %s WHERE id = %s", ("U", 1002))
+
+    response = client.post(
+        "/orders/1002",
+        data={"action": "save", "ship_via": "BOGUS"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT ship_via FROM orders WHERE id = %s", (1002,))
+            (ship_via,) = cur.fetchone()
+    assert ship_via == "U"
 
 
 def test_submit_saves_edited_fields_before_generating_the_csv(
@@ -154,7 +209,7 @@ def test_submit_carries_comment_and_ship_via_into_the_csv(
             "ship_to_state": "CA",
             "ship_to_zip": "94304",
             "comment": "Dr Smith/jp",
-            "ship_via": "UPS",
+            "ship_via": "U",
         },
         follow_redirects=True,
     )
@@ -165,7 +220,7 @@ def test_submit_carries_comment_and_ship_via_into_the_csv(
     with csv_path.open(newline="") as f:
         header_row = next(csv.reader(f))
     assert header_row[HEADER_FIELDS.index("Comment")] == "Dr Smith/jp"
-    assert header_row[HEADER_FIELDS.index("ShipVia")] == "UPS"
+    assert header_row[HEADER_FIELDS.index("ShipVia")] == "U"
 
 
 def test_submit_with_an_empty_comment_is_rejected_and_stays_in_review(client, seed_orders, db_url):

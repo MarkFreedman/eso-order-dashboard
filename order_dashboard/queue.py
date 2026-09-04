@@ -21,6 +21,7 @@ from flask import (
 )
 
 from . import mapping, queries
+from .ship_via import SHIP_VIA_CODE_SET, SHIP_VIA_CODES
 
 bp = Blueprint("queue", __name__)
 
@@ -186,7 +187,11 @@ def detail(order_id: int):
     line_items = queries.get_line_items(order_id)
     sources = queries.get_sources(order_id)
     detail_dict = mapping.db_to_detail(order, line_items, sources)
-    return render_template("detail.html", order=_decorate_order(detail_dict))
+    return render_template(
+        "detail.html",
+        order=_decorate_order(detail_dict),
+        ship_via_codes=SHIP_VIA_CODES,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +248,12 @@ def _save_draft(order_id: int) -> None:
         "ship_to_state": form.get("ship_to_state", "").strip(),
         "ship_to_zip": form.get("ship_to_zip", "").strip(),
         "comment": form.get("comment", "").strip(),
-        "ship_via": form.get("ship_via", "").strip(),
     }
+    # ship_via must be one of Sage's Ship Via codes. Only update it when
+    # valid, so a tampered post can't store a code Sage doesn't recognize.
+    sv = form.get("ship_via", "").strip().upper()
+    if sv in SHIP_VIA_CODE_SET:
+        fields["ship_via"] = sv
     # order_type must be the Sage code 'S' or 'Q' (DB check constraint). Coerce
     # labels and only update it when valid, so a blank or edited value can't 500.
     ot = form.get("order_type", "").strip().upper()
