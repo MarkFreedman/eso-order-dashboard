@@ -77,7 +77,12 @@
 
 {% if order.needs_review_reason %}
 <div class="needs-review-banner">
-  <strong>Needs Review:</strong> {{ order.needs_review_reason }}
+  <div class="needs-review-text">
+    <strong>Needs review</strong>
+    <ul class="needs-review-list">
+      {% for item in order.needs_review_items %}<li>{{ item }}</li>{% endfor %}
+    </ul>
+  </div>
   <form class="needs-review-form" method="post" action="{{ url_for('queue.save', order_id=order.id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="text" name="resolved_order_number" placeholder="Enter correct order number">

@@ -8,6 +8,7 @@ Two separate mappings:
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from vi_export_generator.extract import get_value
@@ -16,6 +17,21 @@ from vi_export_generator.extract import get_value
 # ---------------------------------------------------------------------------
 # DB → Template detail dict
 # ---------------------------------------------------------------------------
+
+def needs_review_items(reason: str | None) -> list[str]:
+    """One banner line per reason. The intake joins the model's review flags
+    with "; ", which reads as one long paragraph on the page (Mark, 2026-09-18:
+    too wordy). Nothing is dropped, each flag just gets its own line, with the
+    trailing period and any stray leading punctuation trimmed."""
+    if not reason:
+        return []
+    items = []
+    for part in re.split(r";\s*", str(reason)):
+        text = part.strip().strip(".;").strip()
+        if text:
+            items.append(text)
+    return items
+
 
 def db_to_detail(
     order: dict[str, Any],
@@ -69,6 +85,7 @@ def db_to_detail(
         "reviewed_by": order.get("reviewed_by"),
         "reviewed_at": order.get("reviewed_at"),
         "needs_review_reason": order.get("needs_review_reason"),
+        "needs_review_items": needs_review_items(order.get("needs_review_reason")),
         "skip_reason": order.get("skip_reason"),
         "order_source": order.get("order_source") or "EMAIL",
         "comment": order.get("comment") or "",

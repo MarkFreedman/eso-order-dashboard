@@ -379,7 +379,7 @@ def seed_orders(client, db_url) -> dict[str, Any]:
                             "payment_type": 1.0,
                         }
                     ),
-                    "needs_review_reason": "No order number found - document may be a cover sheet only",
+                    "needs_review_reason": "No order number found - document may be a cover sheet only; Payment type defaulted to Check pending document review.",
                     "reviewed_by": None,
                     "reviewed_at": None,
                     "submitted_at": None,

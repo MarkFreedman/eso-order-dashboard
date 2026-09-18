@@ -494,3 +494,19 @@ def test_resolving_needs_review_renames_the_placeholder_file(
             )
             row = cur.fetchone()
     assert row == ("orders/PO-12345.pdf", "PO-12345.pdf", 0)
+
+
+def test_needs_review_banner_lists_each_reason_on_its_own_line(client, seed_orders):
+    # Mark, 2026-09-18: the banner read as one long paragraph. Same words,
+    # one line per reason, trailing period trimmed.
+    body = client.get("/orders/1004").get_data(as_text=True)
+    assert "<li>No order number found - document may be a cover sheet only</li>" in body
+    assert "<li>Payment type defaulted to Check pending document review</li>" in body
+    assert "Needs review" in body
+
+
+def test_needs_review_items_splits_on_semicolons_and_keeps_everything():
+    from order_dashboard.mapping import needs_review_items
+
+    assert needs_review_items(None) == []
+    assert needs_review_items("A.; B; ; C.") == ["A", "B", "C"]
