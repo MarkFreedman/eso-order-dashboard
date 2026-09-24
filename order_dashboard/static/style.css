@@ -49,6 +49,21 @@ body {
   border-bottom: 2px solid #d9a441;
 }
 
+.app-user {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: #a9c4dd;
+}
+
+.app-user a {
+  color: #a9c4dd;
+  text-decoration: underline;
+}
+
+.app-user a:hover { color: #fff; }
+
 .app-main {
   max-width: 1200px;
   margin: 0 auto;

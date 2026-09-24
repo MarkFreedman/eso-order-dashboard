@@ -109,6 +109,7 @@ def client(db_url, monkeypatch):
     ensure_schema(db_url)
     monkeypatch.setenv("DATABASE_URL", db_url)
     monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", "0")
     monkeypatch.setenv("BASIC_AUTH_USER", AUTH_USER)
     monkeypatch.setenv("BASIC_AUTH_PASSWORD", AUTH_PASSWORD)
 

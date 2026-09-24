@@ -510,3 +510,13 @@ def test_needs_review_items_splits_on_semicolons_and_keeps_everything():
 
     assert needs_review_items(None) == []
     assert needs_review_items("A.; B; ; C.") == ["A", "B", "C"]
+
+
+def test_save_records_who_made_the_change(client, seed_orders, db_url):
+    # The default test client signs in with the shared login as "tester".
+    client.post("/orders/1002", data={"action": "save", "comment": "checked"}, follow_redirects=True)
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT reviewed_by FROM orders WHERE id = %s", (1002,))
+            (reviewed_by,) = cur.fetchone()
+    assert reviewed_by == "tester"

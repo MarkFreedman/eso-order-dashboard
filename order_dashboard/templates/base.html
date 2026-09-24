@@ -14,6 +14,12 @@
         <a href="{{ url_for('queue.report') }}"{% if request.endpoint == 'queue.report' %} class="active"{% endif %}>Report</a>
         <a href="{{ url_for('queue.vi_files') }}"{% if request.endpoint == 'queue.vi_files' %} class="active"{% endif %}>VI Files</a>
       </nav>
+      {% if current_user %}
+      <div class="app-user">
+        <span>{{ current_user.name }}</span>
+        {% if microsoft_sign_in %}<a href="{{ url_for('auth.logout') }}">Sign out</a>{% endif %}
+      </div>
+      {% endif %}
     </div>
   </header>
   <main class="app-main">

@@ -20,10 +20,19 @@ from flask import (
     url_for,
 )
 
-from . import mapping, queries
+from . import auth, mapping, queries
 from .ship_via import SHIP_VIA_CODE_SET, SHIP_VIA_CODES
 
 bp = Blueprint("queue", __name__)
+
+
+def _reviewer() -> str | None:
+    """Who is making this change: the Microsoft email, or the shared login's username."""
+    label = auth.current_label()
+    if label:
+        return label
+    sent = request.authorization
+    return sent.username if sent and sent.username else None
 
 CONF_GREEN = 0.85
 CONF_YELLOW = 0.60
@@ -292,7 +301,7 @@ def _save_draft(order_id: int) -> None:
     src = form.get("order_source", "").strip().upper()
     if src in ("FAX", "EMAIL"):
         fields["order_source"] = src
-    queries.update_order_fields(order_id, fields)
+    queries.update_order_fields(order_id, fields, reviewed_by=_reviewer())
 
     # Parse line items from form
     items = []
