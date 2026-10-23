@@ -15,7 +15,7 @@ body {
 }
 
 .app-header-inner {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 16px 24px;
   display: flex;
@@ -65,7 +65,7 @@ body {
 .app-user a:hover { color: #fff; }
 
 .app-main {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -575,7 +575,7 @@ body {
   z-index: 10;
 }
 .action-bar-inner {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 12px 24px;
   display: flex;
@@ -776,3 +776,18 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Queue: short values stay on one line; the Customer column takes the slack. */
+.queue-table .nowrap { white-space: nowrap; }
+
+/* Sortable column headings. */
+.queue-table th.sortable a {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.queue-table th.sortable a:hover { color: #0f2b46; text-decoration: underline; }
+.queue-table th.sorted a { color: #0f2b46; }
+.queue-table .sort-mark { font-size: 9px; min-width: 9px; display: inline-block; }

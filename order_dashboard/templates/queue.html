@@ -1,8 +1,18 @@
 {% extends "base.html" %}
 
 {% block head %}
-<script src="{{ url_for('static', filename='queue-refresh.js') }}" defer></script>
+<script src="{{ url_for('static', filename='queue.js') }}" defer></script>
 {% endblock %}
+
+{# A column heading that sorts the queue. Clicking the current column flips the direction. #}
+{% macro sort_th(key, label, extra_class='') -%}
+  {%- set active = (sort == key) -%}
+  {%- set next_dir = 'desc' if (active and direction == 'asc') else 'asc' -%}
+  <th class="sortable {{ extra_class }}{% if active %} sorted{% endif %}"
+      {% if active %}aria-sort="{{ 'ascending' if direction == 'asc' else 'descending' }}"{% endif %}>
+    <a href="{{ url_for('queue.index', sort=key, dir=next_dir) }}">{{ label }}<span class="sort-mark" aria-hidden="true">{% if active %}{{ '▲' if direction == 'asc' else '▼' }}{% endif %}</span></a>
+  </th>
+{%- endmacro %}
 
 {% block content %}
 <section class="queue">
@@ -17,13 +27,13 @@
     <thead>
       <tr>
         <th class="check-col"><input type="checkbox" id="select-all" title="Select all"></th>
-        <th>Status</th>
-        <th>Customer</th>
-        <th>Customer PO</th>
-        <th>Order Date</th>
-        <th class="num">Items</th>
-        <th>Confidence</th>
-        <th>Flags</th>
+        {{ sort_th('status', 'Status') }}
+        {{ sort_th('customer', 'Customer') }}
+        {{ sort_th('po', 'Customer PO') }}
+        {{ sort_th('order_date', 'Order Date') }}
+        {{ sort_th('items', 'Items', 'num') }}
+        {{ sort_th('confidence', 'Confidence') }}
+        {{ sort_th('flags', 'Flags') }}
       </tr>
     </thead>
     <tbody>
@@ -34,7 +44,7 @@
           <input type="checkbox" name="order_ids" value="{{ order.id }}">
           {% endif %}
         </td>
-        <td>
+        <td class="nowrap">
           <span class="pill pill-{{ order.status_class }}">{{ order.status_label }}</span>
         </td>
         <td>
@@ -49,8 +59,8 @@
             </a>
           </div>
         </td>
-        <td class="po-cell">{{ order.po_number or '' }}</td>
-        <td>{{ order.order_date }}</td>
+        <td class="po-cell nowrap">{{ order.po_number or '' }}</td>
+        <td class="nowrap">{{ order.order_date or '' }}</td>
         <td class="num">{{ order.item_count }}</td>
         <td>
           <span class="conf conf-{{ order.conf_band }}" title="{{ '%.0f'|format((order.overall_confidence or 0) * 100) }}%">
@@ -72,17 +82,8 @@
   </table>
 
   <div class="batch-actions">
-    <button type="submit" class="btn btn-primary"
-            onclick="var n = document.querySelectorAll('input[name=order_ids]:checked').length; if (n === 0) { alert('No orders selected.'); return false; } return confirm('Submit ' + n + ' order(s) to Sage?')">Submit Selected to Sage</button>
+    <button type="submit" class="btn btn-primary" id="batch-submit">Submit Selected to Sage</button>
   </div>
   </form>
-
-  <script>
-    document.getElementById('select-all').addEventListener('change', function() {
-      document.querySelectorAll('input[name="order_ids"]').forEach(function(cb) {
-        cb.checked = this.checked;
-      }.bind(this));
-    });
-  </script>
 </section>
 {% endblock %}

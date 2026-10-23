@@ -128,7 +128,11 @@ def _decorate_order(detail: dict) -> dict:
 
 @bp.get("/")
 def index():
-    rows = queries.list_orders()
+    sort = request.args.get("sort", "")
+    direction = "desc" if request.args.get("dir") == "desc" else "asc"
+    if sort not in queries.QUEUE_SORTS:
+        sort, direction = "", "asc"
+    rows = queries.list_orders(sort or None, direction)
     orders = [
         {
             **row,
@@ -139,7 +143,7 @@ def index():
         }
         for row in rows
     ]
-    return render_template("queue.html", orders=orders)
+    return render_template("queue.html", orders=orders, sort=sort, direction=direction)
 
 
 # ---------------------------------------------------------------------------

@@ -9,10 +9,40 @@ from typing import Any
 from .db import get_db
 
 
-def list_orders() -> list[dict[str, Any]]:
+_STATUS_RANK = """CASE o.status
+                WHEN 'extracted' THEN 1
+                WHEN 'in_review' THEN 2
+                WHEN 'error' THEN 3
+                WHEN 'submitted' THEN 4
+                WHEN 'skipped' THEN 5
+            END"""
+
+# Queue columns a user can sort by, and the SQL that orders each. Anything not
+# in here falls back to the default order, so a tampered query string cannot
+# reach the SQL.
+QUEUE_SORTS: dict[str, str] = {
+    "status": _STATUS_RANK,
+    "customer": "lower(COALESCE(o.customer_name, o.customer_no, ''))",
+    "po": "lower(COALESCE(o.po_number, ''))",
+    "order_date": "o.order_date",
+    "items": "COUNT(li.id)",
+    "confidence": "o.overall_confidence",
+    "flags": "(o.needs_review_reason IS NOT NULL OR o.skip_reason IS NOT NULL)",
+}
+
+
+def list_orders(sort: str | None = None, direction: str = "asc") -> list[dict[str, Any]]:
+    """The queue. Default order: work that needs attention first (by status),
+    newest first within a status. ``sort`` names a column from QUEUE_SORTS;
+    blanks sort last either way, and ties keep the newest first."""
     db = get_db()
+    if sort in QUEUE_SORTS:
+        way = "DESC" if direction == "desc" else "ASC"
+        order_by = f"{QUEUE_SORTS[sort]} {way} NULLS LAST, o.created_at DESC"
+    else:
+        order_by = f"{_STATUS_RANK}, o.created_at DESC"
     rows = db.execute(
-        """
+        f"""
         SELECT o.id, o.status, o.customer_name, o.customer_no, o.po_number,
                o.order_date, o.overall_confidence, o.needs_review_reason,
                o.order_source, o.created_at, o.skip_reason,
@@ -20,15 +50,7 @@ def list_orders() -> list[dict[str, Any]]:
         FROM orders o
         LEFT JOIN line_items li ON li.order_id = o.id
         GROUP BY o.id
-        ORDER BY
-            CASE o.status
-                WHEN 'extracted' THEN 1
-                WHEN 'in_review' THEN 2
-                WHEN 'error' THEN 3
-                WHEN 'submitted' THEN 4
-                WHEN 'skipped' THEN 5
-            END,
-            o.created_at DESC
+        ORDER BY {order_by}
         """
     ).fetchall()
     return [dict(r) for r in rows]

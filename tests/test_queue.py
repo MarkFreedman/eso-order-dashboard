@@ -60,18 +60,62 @@ def test_batch_submit_leaves_out_blank_comment_and_skipped_orders(
     assert len(list(tmp_path.glob("batch_*.csv"))) == 1
 
 
-def test_queue_page_loads_the_auto_refresh_script_and_order_page_does_not(client, seed_orders):
+def test_queue_page_loads_its_script_and_order_page_does_not(client, seed_orders):
+    # Select-all, the submit confirm and the 60-second auto-refresh live in
+    # queue.js: the page's security header blocks inline scripts.
     queue = client.get("/").get_data(as_text=True)
-    assert "queue-refresh.js" in queue
-    assert client.get("/static/queue-refresh.js").status_code == 200
+    assert "queue.js" in queue
+    assert "<script>" not in queue
+    assert "onclick=" not in queue
+    assert client.get("/static/queue.js").status_code == 200
     detail = client.get("/orders/1001").get_data(as_text=True)
-    assert "queue-refresh.js" not in detail
+    assert "queue.js" not in detail
 
 
 def test_queue_shows_the_customer_po_number(client, seed_orders):
     # Mark, 2026-10-23: the queue had no order number on it, so a row could
     # not be matched to the paper without opening it.
     html = client.get("/").get_data(as_text=True)
-    assert "<th>Customer PO</th>" in html
+    assert ">Customer PO<" in html
     assert "PO-998877" in html
     assert "TUL-88241" in html
+
+
+def _customer_order(html: str) -> list[str]:
+    import re
+
+    return re.findall(r'class="customer-link"[^>]*>([^<]*)<', html)
+
+
+def test_queue_sorts_by_order_date_both_ways_with_blanks_last(client, seed_orders):
+    asc = _customer_order(client.get("/?sort=order_date&dir=asc").get_data(as_text=True))
+    assert asc == [
+        "Riverview Low Vision Clinic",  # 2026-04-11
+        "Statewide Vision Services",  # 2026-04-13
+        "VA Sample Clinic - Riverview",  # 2026-04-14
+        "Downtown Vision Center",  # 2026-04-15
+        "Order #1004",  # no date
+    ]
+    desc = _customer_order(client.get("/?sort=order_date&dir=desc").get_data(as_text=True))
+    assert desc == [
+        "Downtown Vision Center",
+        "VA Sample Clinic - Riverview",
+        "Statewide Vision Services",
+        "Riverview Low Vision Clinic",
+        "Order #1004",
+    ]
+
+
+def test_queue_sort_header_shows_direction_and_flips_on_click(client, seed_orders):
+    html = client.get("/?sort=customer&dir=asc").get_data(as_text=True)
+    assert 'aria-sort="ascending"' in html
+    assert "/?sort=customer&amp;dir=desc" in html  # the active column offers the flip
+    assert "/?sort=order_date&amp;dir=asc" in html  # others start ascending
+
+
+def test_queue_ignores_an_unknown_sort_column(client, seed_orders):
+    default = _customer_order(client.get("/").get_data(as_text=True))
+    tampered = client.get("/?sort=1;DROP&dir=desc")
+    assert tampered.status_code == 200
+    assert _customer_order(tampered.get_data(as_text=True)) == default
+    assert "aria-sort" not in tampered.get_data(as_text=True)
