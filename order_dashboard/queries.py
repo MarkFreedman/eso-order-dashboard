@@ -149,6 +149,9 @@ def submit_order(order_id: int, vi_file_path: str | None = None) -> None:
            WHERE id = %s""",
         (_now(), vi_file_path, order_id),
     )
+    # The order is in Sage now and the G drive holds the permanent document,
+    # so the database copy kept for the viewer can go.
+    db.execute("UPDATE sources SET file_bytes = NULL WHERE order_id = %s", (order_id,))
     db.commit()
 
 

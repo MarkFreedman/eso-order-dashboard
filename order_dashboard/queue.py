@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 from datetime import date, datetime
+from io import BytesIO
 from itertools import groupby
 from pathlib import Path
 
@@ -448,10 +449,22 @@ def source_file(source_id: int):
     from .db import get_db
     db = get_db()
     row = db.execute(
-        "SELECT gdrive_path, original_filename FROM sources WHERE id = %s",
+        "SELECT gdrive_path, original_filename, file_bytes FROM sources WHERE id = %s",
         (source_id,),
     ).fetchone()
-    if row is None or not row["gdrive_path"]:
+    if row is None:
+        abort(404)
+
+    # The reader stores a copy of the filed PDF in the row (migration 003);
+    # that is what the viewer shows. Rows from before that, or whose copy was
+    # dropped on submit, fall back to the file on disk if this machine has it.
+    if row["file_bytes"]:
+        return send_file(
+            BytesIO(bytes(row["file_bytes"])),
+            mimetype="application/pdf",
+            download_name=row["original_filename"] or "source.pdf",
+        )
+    if not row["gdrive_path"]:
         abort(404)
 
     storage_root = Path(os.environ.get("FILE_STORAGE_ROOT", "../intake-service")).resolve()
