@@ -58,3 +58,11 @@ def test_batch_submit_leaves_out_blank_comment_and_skipped_orders(
             statuses = dict(cur.fetchall())
     assert statuses == {1001: "submitted", 1002: "extracted", 1005: "skipped"}
     assert len(list(tmp_path.glob("batch_*.csv"))) == 1
+
+
+def test_queue_page_loads_the_auto_refresh_script_and_order_page_does_not(client, seed_orders):
+    queue = client.get("/").get_data(as_text=True)
+    assert "queue-refresh.js" in queue
+    assert client.get("/static/queue-refresh.js").status_code == 200
+    detail = client.get("/orders/1001").get_data(as_text=True)
+    assert "queue-refresh.js" not in detail

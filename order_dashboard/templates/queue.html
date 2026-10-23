@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block head %}
+<script src="{{ url_for('static', filename='queue-refresh.js') }}" defer></script>
+{% endblock %}
+
 {% block content %}
 <section class="queue">
   <div class="queue-heading">
