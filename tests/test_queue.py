@@ -66,3 +66,12 @@ def test_queue_page_loads_the_auto_refresh_script_and_order_page_does_not(client
     assert client.get("/static/queue-refresh.js").status_code == 200
     detail = client.get("/orders/1001").get_data(as_text=True)
     assert "queue-refresh.js" not in detail
+
+
+def test_queue_shows_the_customer_po_number(client, seed_orders):
+    # Mark, 2026-10-23: the queue had no order number on it, so a row could
+    # not be matched to the paper without opening it.
+    html = client.get("/").get_data(as_text=True)
+    assert "<th>Customer PO</th>" in html
+    assert "PO-998877" in html
+    assert "TUL-88241" in html

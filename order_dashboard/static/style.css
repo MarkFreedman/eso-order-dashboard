@@ -770,3 +770,9 @@ body {
   line-height: 1.35;
 }
 .needs-review-list li { margin: 2px 0; }
+
+/* Queue: the customer's PO number, as typed on their document. */
+.queue-table .po-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

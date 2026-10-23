@@ -19,6 +19,7 @@
         <th class="check-col"><input type="checkbox" id="select-all" title="Select all"></th>
         <th>Status</th>
         <th>Customer</th>
+        <th>Customer PO</th>
         <th>Order Date</th>
         <th class="num">Items</th>
         <th>Confidence</th>
@@ -48,6 +49,7 @@
             </a>
           </div>
         </td>
+        <td class="po-cell">{{ order.po_number or '' }}</td>
         <td>{{ order.order_date }}</td>
         <td class="num">{{ order.item_count }}</td>
         <td>
