@@ -110,3 +110,7 @@ python3 -m pytest tests/ -v
 - Keep it simple. Server-rendered pages, minimal JavaScript. No SPA complexity.
 - The team is not technical. UI should be obvious. No jargon, clear labels, big buttons.
 - Confidence scores should map to visual cues (green/yellow/red or similar) so low-confidence fields are immediately visible without reading numbers.
+
+## Git hooks
+
+A pre-commit hook in `.githooks/` blocks any commit containing a full credit card number (15 or 16 digits that pass the Luhn checksum). Install once per clone: `git config core.hooksPath .githooks`.

@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refuse to commit anything containing a full credit card number: 15 or 16
+# digits (spaces or dashes allowed) that pass the Luhn checksum. Protects test
+# fixtures, docs and logs. Install once per clone: git config core.hooksPath .githooks
+python3 - <<'PY'
+import re, subprocess, sys
+diff = subprocess.run(["git", "diff", "--cached", "--unified=0", "--no-color"], capture_output=True, text=True).stdout
+cand = re.compile(r"(?<!\d)(?:\d[ -]?){14,15}\d(?!\d)")
+def luhn(d):
+    t = 0
+    for i, ch in enumerate(reversed(d)):
+        n = int(ch)
+        if i % 2: n = n * 2 - (9 if n > 4 else 0)
+        t += n
+    return t % 10 == 0
+bad = []
+path = None
+for line in diff.splitlines():
+    if line.startswith("+++ "): path = line[4:]; continue
+    if not line.startswith("+") or line.startswith("+++"): continue
+    for m in cand.finditer(line):
+        d = re.sub(r"\D", "", m.group(0))
+        if len(d) in (15, 16) and luhn(d) and d not in ("4111111111111111", "378282246310005"):
+            bad.append(f"{path}: ...{d[-4:]}")
+if bad:
+    print("Commit blocked: full card number(s) in the staged changes (last 4 shown):")
+    for b in bad: print("  " + b)
+    sys.exit(1)
+PY
