@@ -448,11 +448,11 @@ def test_a_partial_post_leaves_fields_it_did_not_carry_alone(
     )
 
 
-def test_resolving_needs_review_renames_the_placeholder_file(
+def test_resolving_needs_review_sets_the_number_and_leaves_the_file_to_the_reader(
     client, seed_orders, db_url, tmp_path, monkeypatch
 ):
-    # The rename used an undefined name, so resolving a needs-review order
-    # with a real placeholder file on disk raised a NameError.
+    # This app has no path to the G drive, so Resolve only records the number;
+    # the reader renames the placeholder file on its next cycle.
     monkeypatch.setenv("FILE_STORAGE_ROOT", str(tmp_path))
     folder = tmp_path / "orders"
     folder.mkdir()
@@ -481,19 +481,19 @@ def test_resolving_needs_review_renames_the_placeholder_file(
         follow_redirects=True,
     )
     assert response.status_code == 200
+    assert b"renamed within a few minutes" in response.data
 
-    assert (folder / "PO-12345.pdf").is_file()
-    assert not (folder / "placeholder-1004.pdf").exists()
-
+    assert (folder / "placeholder-1004.pdf").is_file()
     with psycopg.connect(db_url, autocommit=True) as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT po_number, needs_review_reason FROM orders WHERE id = 1004")
+            assert cur.fetchone() == ("PO-12345", None)
             cur.execute(
                 "SELECT gdrive_path, gdrive_filename, is_placeholder "
                 "FROM sources WHERE order_id = %s",
                 (1004,),
             )
-            row = cur.fetchone()
-    assert row == ("orders/PO-12345.pdf", "PO-12345.pdf", 0)
+            assert cur.fetchone() == ("orders/placeholder-1004.pdf", "placeholder-1004.pdf", 1)
 
 
 def test_needs_review_banner_lists_each_reason_on_its_own_line(client, seed_orders):

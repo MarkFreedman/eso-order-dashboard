@@ -164,19 +164,16 @@ def mark_error(order_id: int, message: str) -> None:
     db.commit()
 
 
-def resolve_needs_review(order_id: int, order_number: str) -> list[dict[str, Any]]:
-    """Set the order number and return placeholder sources for renaming."""
+def resolve_needs_review(order_id: int, order_number: str) -> None:
+    """Set the order number and clear the banner. The placeholder file keeps
+    its name until the reader, which can reach the G drive, renames it on its
+    next cycle (it looks for placeholder sources whose order now has a number)."""
     db = get_db()
     db.execute(
         "UPDATE orders SET po_number = %s, needs_review_reason = NULL WHERE id = %s",
         (order_number, order_id),
     )
-    placeholders = db.execute(
-        "SELECT id, gdrive_path, placeholder_name FROM sources WHERE order_id = %s AND is_placeholder = 1",
-        (order_id,),
-    ).fetchall()
     db.commit()
-    return [dict(r) for r in placeholders]
 
 
 def _now() -> str:

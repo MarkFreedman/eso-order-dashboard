@@ -216,9 +216,10 @@ def save(order_id: int):
     # Handle needs-review resolution
     resolved = request.form.get("resolved_order_number", "").strip()
     if resolved:
-        placeholders = queries.resolve_needs_review(order_id, resolved)
-        _rename_placeholders(placeholders, resolved)
-        flash(f"Order number set to {resolved}")
+        # The reader renames the file on the G drive on its next cycle; this
+        # app has no path to the drive.
+        queries.resolve_needs_review(order_id, resolved)
+        flash(f"Order number set to {resolved}. The file on the G drive is renamed within a few minutes.")
         return redirect(url_for("queue.detail", order_id=order_id))
 
     if action == "save":
@@ -529,34 +530,6 @@ def vi_file(filename: str):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _rename_placeholders(placeholders: list[dict], order_number: str) -> None:
-    """Rename needs-review placeholder files on disk."""
-    # Finding 2: sanitize user-supplied order number before using it in a
-    # file rename, and verify the result stays within the storage root.
-    safe = "".join(c for c in order_number if c.isalnum() or c in "-_.")
-    storage_root = Path(os.environ.get("FILE_STORAGE_ROOT", "../intake-service")).resolve()
-    for p in placeholders:
-        old_path = (storage_root / p["gdrive_path"]).resolve()
-        if not old_path.is_relative_to(storage_root):
-            continue
-        if old_path.exists():
-            new_name = f"{safe}.pdf"
-            new_path = (old_path.parent / new_name).resolve()
-            if not new_path.is_relative_to(storage_root):
-                continue
-            old_path.rename(new_path)
-            from .db import get_db
-            db = get_db()
-            db.execute(
-                """UPDATE sources
-                   SET gdrive_path = %s, gdrive_filename = %s,
-                       is_placeholder = 0
-                   WHERE id = %s""",
-                (str(Path(p["gdrive_path"]).parent / new_name), new_name, p["id"]),
-            )
-            db.commit()
-
 
 def _parse_date(value: str | None) -> date | None:
     """Parse a YYYY-MM-DD query-string value; return None if absent or invalid."""
