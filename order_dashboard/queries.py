@@ -90,6 +90,24 @@ def get_sources(order_id: int) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+# The reader's banner line for a document with no order number. Must match
+# NO_ORDER_NUMBER_REASON in intake-service/intake_service/orchestrator.py. It
+# contains a semicolon of its own, so it shows as two banner lines.
+NO_ORDER_NUMBER_REASON = (
+    "No PO or order number found on the document; enter it to file the PDF under it"
+)
+_NO_ORDER_NUMBER_PARTS = {p.strip() for p in NO_ORDER_NUMBER_REASON.split(";")}
+
+
+def drop_no_order_number_line(reason: str | None) -> str | None:
+    """The review reason without the reader's "no order number" line, or None
+    when that was the only line."""
+    if not reason:
+        return None
+    kept = [p.strip() for p in reason.split(";") if p.strip() and p.strip() not in _NO_ORDER_NUMBER_PARTS]
+    return "; ".join(kept) or None
+
+
 def update_order_fields(order_id: int, fields: dict[str, Any], reviewed_by: str | None = None) -> None:
     """Update allowed order fields. Sets status to in_review if currently extracted."""
     db = get_db()
@@ -107,6 +125,11 @@ def update_order_fields(order_id: int, fields: dict[str, Any], reviewed_by: str 
     current = get_order(order_id)
     if current and current["status"] == "extracted":
         updates["status"] = "in_review"
+    if updates.get("po_number") and current and current.get("needs_review_reason"):
+        # Typing the number into the Customer PO field settles the "no order
+        # number" line the same way the Resolve box does; the reader then
+        # renames the file. Other review lines stay.
+        updates["needs_review_reason"] = drop_no_order_number_line(current["needs_review_reason"])
     if reviewed_by:
         updates["reviewed_by"] = reviewed_by
         updates["reviewed_at"] = _now()

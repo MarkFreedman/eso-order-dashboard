@@ -520,3 +520,40 @@ def test_save_records_who_made_the_change(client, seed_orders, db_url):
             cur.execute("SELECT reviewed_by FROM orders WHERE id = %s", (1002,))
             (reviewed_by,) = cur.fetchone()
     assert reviewed_by == "tester"
+
+
+def test_saving_a_po_number_clears_the_no_order_number_line_but_keeps_the_rest(
+    client, seed_orders, db_url
+):
+    # Mark, 2026-10-23: typed the number into Customer PO and saved instead of
+    # using the Resolve box; the file got renamed but the banner still said
+    # there was no number.
+    reason = (
+        "No PO or order number found on the document; enter it to file the PDF under it; "
+        "Customer number not present; needs manual lookup."
+    )
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE orders SET po_number = NULL, needs_review_reason = %s WHERE id = 1001",
+                (reason,),
+            )
+
+    client.post("/orders/1001", data={"action": "save", "po_number": "TEST-1"}, follow_redirects=True)
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT po_number, needs_review_reason FROM orders WHERE id = 1001")
+            assert cur.fetchone() == ("TEST-1", "Customer number not present; needs manual lookup.")
+
+    # Only that line: the banner goes away entirely.
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE orders SET po_number = NULL, needs_review_reason = %s WHERE id = 1001",
+                ("No PO or order number found on the document; enter it to file the PDF under it",),
+            )
+    client.post("/orders/1001", data={"action": "save", "po_number": "TEST-2"}, follow_redirects=True)
+    with psycopg.connect(db_url, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT po_number, needs_review_reason FROM orders WHERE id = 1001")
+            assert cur.fetchone() == ("TEST-2", None)
